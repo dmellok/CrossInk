@@ -21,6 +21,9 @@
 #include "KOReaderSettingsActivity.h"
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
+#ifdef CROSSINK_TESSERAE
+#include "TesseraeSettingsActivity.h"
+#endif
 #include "OtaUpdateActivity.h"
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
@@ -724,6 +727,11 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::OPDSBrowser:
         startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
         break;
+#ifdef CROSSINK_TESSERAE
+      case SettingAction::TesseraeDashboard:
+        startActivityForResult(std::make_unique<TesseraeSettingsActivity>(renderer, mappedInput), resultHandler);
+        break;
+#endif
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false), resultHandler);
         break;

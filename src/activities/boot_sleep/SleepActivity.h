@@ -24,6 +24,12 @@ class SleepActivity final : public Activity {
   void renderMinimalSleepScreen() const;
   void renderMinimalStatsSleepScreen() const;
   void renderDashboardSleepScreen() const;
+#ifdef CROSSINK_TESSERAE
+  // Fetches a Tesserae dashboard frame on sleep entry. Every failure path
+  // falls through to renderTesseraeFallbackSleepScreen().
+  void renderTesseraeSleepScreen() const;
+  void renderTesseraeFallbackSleepScreen() const;
+#endif
   void renderBitmapSleepScreen(const Bitmap& bitmap) const;
   void renderLastScreenSleepScreen() const;
   void renderBlankSleepScreen() const;

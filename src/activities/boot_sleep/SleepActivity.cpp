@@ -24,6 +24,11 @@
 #include "CrossPointState.h"
 #include "RecentBooksStore.h"
 #include "SleepCoverAssets.h"
+#ifdef CROSSINK_TESSERAE
+#include "TesseraeStore.h"
+#include "network/TesseraeClient.h"
+#include "network/WifiAutoConnect.h"
+#endif
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "components/themes/dashboard/DashboardTheme.h"
@@ -473,6 +478,10 @@ void SleepActivity::onEnter() {
       return renderMinimalStatsSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::DASHBOARD_SLEEP):
       return renderDashboardSleepScreen();
+#ifdef CROSSINK_TESSERAE
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::TESSERAE_SLEEP):
+      return renderTesseraeSleepScreen();
+#endif
     default:
       return renderDefaultSleepScreen();
   }
@@ -748,6 +757,184 @@ void SleepActivity::renderDashboardSleepScreen() const {
                         sleepCoverFilterInvertsGeneratedScreen());
   renderer.displayBuffer(HalDisplay::FULL_REFRESH, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH);
 }
+
+#ifdef CROSSINK_TESSERAE
+namespace {
+
+// The cache is only meaningful alongside the render_id it was painted from:
+// without one there is nothing to send as If-None-Match, so a 304 can never
+// arrive and the cache can never be the thing that satisfies it.
+bool tesseraeFrameCacheIsUsable() {
+  if (TESSERAE_STORE.getLastRenderId().empty()) return false;
+  return Storage.exists(TESSERAE_FRAME_CACHE_PATH);
+}
+
+bool loadTesseraeFrameCache(uint8_t* dest, const size_t capacity) {
+  if (dest == nullptr || capacity < TESSERAE_FRAME_BYTES) return false;
+
+  HalFile file;
+  if (!Storage.openFileForRead("TSR", TESSERAE_FRAME_CACHE_PATH, file)) return false;
+  const size_t read = file.read(dest, TESSERAE_FRAME_BYTES);
+  file.close();
+
+  if (read != TESSERAE_FRAME_BYTES) {
+    LOG_ERR("TSR", "Cached frame is %zu bytes, expected %zu", read, TESSERAE_FRAME_BYTES);
+    return false;
+  }
+  return true;
+}
+
+void saveTesseraeFrameCache(const uint8_t* source, const size_t size) {
+  if (source == nullptr || size < TESSERAE_FRAME_BYTES) return;
+
+  HalFile file;
+  if (!Storage.openFileForWrite("TSR", TESSERAE_FRAME_CACHE_PATH, file)) {
+    LOG_ERR("TSR", "Could not open frame cache for write");
+    return;
+  }
+  const size_t written = file.write(source, TESSERAE_FRAME_BYTES);
+  file.close();
+
+  if (written != TESSERAE_FRAME_BYTES) {
+    // A short write would be indistinguishable from a good cache on the next
+    // read attempt's size check, but remove it anyway so the next sleep pays a
+    // download instead of reading a torn frame.
+    LOG_ERR("TSR", "Frame cache short write: %zu of %zu bytes", written, TESSERAE_FRAME_BYTES);
+    Storage.remove(TESSERAE_FRAME_CACHE_PATH);
+  }
+}
+
+}  // namespace
+
+// Paints a server-rendered Tesserae dashboard fetched on sleep entry.
+//
+// The frame arrives as the native 1-bpp mono buffer the esp32_bw_bin renderer
+// packs (MSB-first, bit-set = white) at the panel's native stride, which is
+// byte-identical to the CrossInk framebuffer, so a validated frame is a plain
+// copy with no decode step. The copy target is the renderer's framebuffer,
+// which HalDisplay owns, so the paint inherits the panel-controller detection
+// done in HalGPIO::begin() for free.
+//
+// Radio comes up only on this explicit sleep transition, never on a timer, and
+// goes down again before the refresh so the slow paint doesn't share the rail
+// with an active station.
+void SleepActivity::renderTesseraeSleepScreen() const {
+  TESSERAE_STORE.loadFromFile();
+
+  if (!TESSERAE_STORE.isEnabled() || TESSERAE_STORE.getServerUrl().empty()) {
+    LOG_INF("TSR", "Tesserae sleep screen selected but not configured");
+    return renderTesseraeFallbackSleepScreen();
+  }
+
+  // The X3's 792x528 panel packs a different number of bytes, and no Tesserae
+  // SKU describes it yet. Bail before touching the radio rather than painting
+  // a frame at the wrong stride.
+  uint8_t* frameBuffer = renderer.getFrameBuffer();
+  const size_t bufferSize = renderer.getBufferSize();
+  if (frameBuffer == nullptr || bufferSize != TESSERAE_FRAME_BYTES) {
+    LOG_ERR("TSR", "Framebuffer is %zu bytes, Tesserae frame is %zu", bufferSize, TESSERAE_FRAME_BYTES);
+    return renderTesseraeFallbackSleepScreen();
+  }
+
+  if (!WifiAutoConnect::connect()) {
+    return renderTesseraeFallbackSleepScreen();
+  }
+
+  // Zero-touch discover. Also covers MAC auto-claim, so a reflashed device
+  // silently re-acquires its existing token.
+  if (!TESSERAE_STORE.isPaired()) {
+    const TesseraeClient::Result discovery = TesseraeClient::discover();
+    if (discovery != TesseraeClient::Result::Ok) {
+      LOG_INF("TSR", "Pairing incomplete: %s", TesseraeClient::resultToString(discovery));
+      WifiAutoConnect::disconnect();
+      return renderTesseraeFallbackSleepScreen();
+    }
+  }
+
+  // A conditional request is only worth making when the cache can satisfy the
+  // 304. Ask unconditionally otherwise, so an unchanged dashboard still yields
+  // bytes to paint rather than a fallback screen. A refresh shortcut clears the
+  // stored render_id, which lands here as "no cache, ask unconditionally".
+  const bool forceRefresh = !tesseraeFrameCacheIsUsable();
+
+  TesseraeClient::FrameInfo frame;
+  const TesseraeClient::Result frameResult = TesseraeClient::fetchFrameInfo(frame, forceRefresh);
+
+  if (frameResult == TesseraeClient::Result::NotModified) {
+    // Biggest win in the loop: skips the 48 KB download and its radio airtime.
+    // The refresh itself is unavoidable here, since the panel is showing the
+    // reader UI rather than the previous dashboard.
+    LOG_INF("TSR", "Frame unchanged; repainting from cache");
+    TesseraeClient::postStatus();
+    WifiAutoConnect::disconnect();
+    if (loadTesseraeFrameCache(frameBuffer, bufferSize)) {
+      renderer.displayBuffer(HalDisplay::HALF_REFRESH, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH);
+      return;
+    }
+    LOG_ERR("TSR", "Cached frame unreadable; falling back");
+    return renderTesseraeFallbackSleepScreen();
+  }
+
+  if (frameResult != TesseraeClient::Result::Ok) {
+    LOG_INF("TSR", "No frame to paint: %s", TesseraeClient::resultToString(frameResult));
+    WifiAutoConnect::disconnect();
+    return renderTesseraeFallbackSleepScreen();
+  }
+
+  // Download straight into the framebuffer. A partial write leaves it dirty,
+  // but every fallback path clears the screen before drawing, so a failed
+  // fetch can't leak half a dashboard onto the panel.
+  const TesseraeClient::Result download =
+      TesseraeClient::downloadFrame(frame.url, frameBuffer, bufferSize, TESSERAE_FRAME_BYTES);
+
+  if (download == TesseraeClient::Result::Ok) {
+    // Heartbeat while the radio is still up, before the slow refresh.
+    TesseraeClient::postStatus();
+  }
+  WifiAutoConnect::disconnect();
+
+  if (download != TesseraeClient::Result::Ok) {
+    LOG_ERR("TSR", "Frame download failed: %s", TesseraeClient::resultToString(download));
+    return renderTesseraeFallbackSleepScreen();
+  }
+
+  // Cache before painting: if the write fails the frame still paints, it just
+  // costs a full download next time.
+  saveTesseraeFrameCache(frameBuffer, bufferSize);
+  TESSERAE_STORE.setLastRenderId(frame.renderId);
+  LOG_INF("TSR", "Painting Tesserae frame %s", frame.renderId.c_str());
+
+  // Single HALF refresh, matching every other sleep screen: the OEM X4's only
+  // clean refresh in normal operation. See renderDefaultSleepScreen().
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH);
+}
+
+// Repaints whichever sleep screen the user had selected before switching to
+// Tesserae, so a dashboard failure never leaves a blank or broken panel.
+void SleepActivity::renderTesseraeFallbackSleepScreen() const {
+  switch (TESSERAE_STORE.getFallbackSleepScreen()) {
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM):
+      return renderCustomSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER):
+      return renderCoverSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM):
+      return APP_STATE.lastSleepFromReader ? renderCoverSleepScreen() : renderCustomSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::BLANK):
+      return renderBlankSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::READING_STATS_SLEEP):
+      return renderReadingStatsSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::MINIMAL_SLEEP):
+      return renderMinimalSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::MINIMAL_STATS_SLEEP):
+      return renderMinimalStatsSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::DASHBOARD_SLEEP):
+      return renderDashboardSleepScreen();
+    default:
+      // DARK / LIGHT and anything unrecognised land on the built-in screen.
+      return renderDefaultSleepScreen();
+  }
+}
+#endif  // CROSSINK_TESSERAE
 
 void SleepActivity::renderLastScreenSleepScreen() const {
   const auto pageHeight = renderer.getScreenHeight();

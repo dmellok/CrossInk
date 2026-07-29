@@ -66,6 +66,9 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "AppVersion.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#ifdef CROSSINK_TESSERAE
+#include "TesseraeStore.h"
+#endif
 #include "GlobalActions.h"
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
@@ -487,6 +490,18 @@ bool handleGlobalPowerButtonAction(const CrossPointSettings::SHORT_PWRBTN action
       ScreenshotUtil::takeScreenshot(renderer);
       return true;
     }
+#ifdef CROSSINK_TESSERAE
+    case CrossPointSettings::SHORT_PWRBTN::TESSERAE_REFRESH:
+      // Drop the cached render_id so the sleep path sends no If-None-Match and
+      // the server answers 200 with a full frame. Then sleep, which is where
+      // the fetch and paint actually happen -- the radio only ever comes up on
+      // a sleep transition.
+      TESSERAE_STORE.loadFromFile();
+      TESSERAE_STORE.setLastRenderId("");
+      LOG_DBG("MAIN", "Tesserae refresh requested; sleeping with a forced fetch");
+      enterDeepSleep();
+      return true;
+#endif
     case CrossPointSettings::SHORT_PWRBTN::SYNC_PROGRESS:
       if (activityManager.canSnapshotForSleepOverlay()) {
         return false;

@@ -40,6 +40,9 @@ enum class SettingAction {
   Language,
   DownloadFonts,
   ClockSync,
+#ifdef CROSSINK_TESSERAE
+  TesseraeDashboard,
+#endif
 };
 
 struct SettingInfo {

@@ -38,6 +38,9 @@ class CrossPointSettings {
     QUICK_RESUME = 9,
     MINIMAL_STATS_SLEEP = 10,
     DASHBOARD_SLEEP = 11,
+    // Declared unconditionally, even when CROSSINK_TESSERAE is compiled out,
+    // so the persisted sleep-screen value means the same thing in every build.
+    TESSERAE_SLEEP = 12,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
@@ -223,6 +226,9 @@ class CrossPointSettings {
     JOIN_NETWORK = 19,
     CREATE_HOTSPOT = 20,
     CREATE_CLIPPING = 21,
+    // Declared unconditionally so the persisted shortcut value means the same
+    // thing whether or not CROSSINK_TESSERAE is compiled in.
+    TESSERAE_REFRESH = 22,
     SHORT_PWRBTN_COUNT
   };
 

@@ -12,6 +12,9 @@ inline bool isPowerButtonActionAvailableOutsideReader(const CrossPointSettings::
     case CrossPointSettings::SHORT_PWRBTN::CALIBRE_WIRELESS:
     case CrossPointSettings::SHORT_PWRBTN::JOIN_NETWORK:
     case CrossPointSettings::SHORT_PWRBTN::CREATE_HOTSPOT:
+#ifdef CROSSINK_TESSERAE
+    case CrossPointSettings::SHORT_PWRBTN::TESSERAE_REFRESH:
+#endif
       return true;
     case CrossPointSettings::SHORT_PWRBTN::IGNORE:
     case CrossPointSettings::SHORT_PWRBTN::PAGE_TURN:
@@ -27,6 +30,9 @@ inline bool isPowerButtonActionAvailableOutsideReader(const CrossPointSettings::
     case CrossPointSettings::SHORT_PWRBTN::FOOTNOTES:
     case CrossPointSettings::SHORT_PWRBTN::FILE_BROWSER:
     case CrossPointSettings::SHORT_PWRBTN::CREATE_CLIPPING:
+#ifndef CROSSINK_TESSERAE
+    case CrossPointSettings::SHORT_PWRBTN::TESSERAE_REFRESH:
+#endif
     case CrossPointSettings::SHORT_PWRBTN::SHORT_PWRBTN_COUNT:
     default:
       return false;
