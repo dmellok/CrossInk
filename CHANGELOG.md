@@ -3,9 +3,12 @@
 ### Added
 
 - Tesserae dashboard sleep screen. Pick `Tesserae` under Display > Sleep Screen and the reader fetches a server-rendered dashboard on sleep entry and paints it as the sleep image. WiFi comes up only on an explicit sleep transition, never on a timer, so the refresh rate is bounded by how often you actually put the reader down.
-- Tesserae Dashboard settings screen (Settings > System) with server URL, an enable toggle, a fallback sleep screen, pairing status, and a `Test now` action that fetches and previews a real frame.
-- `Refresh Dashboard` button shortcut, which discards the cached frame so the next sleep fetches a fresh one.
+- 4-level grayscale dashboards, so photos and shading render properly instead of being flattened to black and white.
+- Tesserae Dashboard settings screen (Settings > System) with server URL, an enable toggle, `Always fetch fresh`, a fallback sleep screen, pairing status, and a `Test now` action that fetches and previews a real frame on the panel.
+- `Refresh Dashboard` button shortcut, which discards the cached frame so the next sleep asks the server for a freshly rendered one.
+- Dashboards are cached on the SD card, so an unchanged dashboard repaints without re-downloading it.
 - Pairing is zero-touch: the reader announces itself and you approve it once in Tesserae. A reflashed device silently re-acquires its existing pairing by MAC.
+- Battery, signal and IP are reported back to Tesserae after each dashboard paint, so the reader shows as online there.
 
 ### Fixed
 

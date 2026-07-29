@@ -1,3 +1,17 @@
+> ### ⚠️ `tesserae-client` branch
+>
+> **This branch adds a [Tesserae](https://github.com/dmellok/tesserae) dashboard client to CrossInk.** It is a fork of [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk), branched from `main`, and is **not** intended to be merged upstream: CrossInk's [`SCOPE.md`](./SCOPE.md) lists *Active Connectivity* as out of scope, which is a reasonable call for a reading device. It is kept as a thin patch series on top of `main` instead.
+>
+> Pick **Tesserae** under *Display → Sleep Screen* and the reader fetches a server-rendered dashboard on sleep entry and paints it as the sleep image. The radio comes up only on an explicit sleep transition, never on a timer, so the refresh rate is bounded by how often you actually put the reader down. Every failure path falls through to your normal sleep screen.
+>
+> Everything is behind `-DCROSSINK_TESSERAE`, so it compiles out entirely (~17 KB of flash when enabled).
+>
+> **Status:** working on the Xteink X4. See [Tesserae dashboard client](./docs/tesserae.md) for setup, current limitations and what is still unbuilt.
+>
+> For everything else, the upstream README follows.
+
+---
+
 > **This is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)** with a focus on improved fonts and minimal reading stats.
 
 ## What's different in this fork

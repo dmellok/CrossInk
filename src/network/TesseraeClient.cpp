@@ -36,6 +36,8 @@ const char* TesseraeClient::resultToString(const Result result) {
 #include <HalStorage.h>
 #include <Logging.h>
 
+#include <algorithm>
+
 TesseraeClient::Result TesseraeClient::discover() { return Result::Ok; }
 
 TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool forceRefresh) {
@@ -55,6 +57,43 @@ TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool
 }
 
 TesseraeClient::Result TesseraeClient::postStatus() { return Result::Ok; }
+
+TesseraeClient::Result TesseraeClient::downloadFrameToFile(const std::string& url, const char* destPath,
+                                                           const size_t expectedBytes) {
+  if (destPath == nullptr) return Result::BadFrameSize;
+
+  HalFile in;
+  if (!Storage.openFileForRead("TSR", url, in)) {
+    LOG_INF("TSR", "No simulator frame at %s; falling back", url.c_str());
+    return Result::NetworkError;
+  }
+
+  HalFile out;
+  if (!Storage.openFileForWrite("TSR", std::string(destPath), out)) {
+    in.close();
+    LOG_ERR("TSR", "Could not open %s for write", destPath);
+    return Result::NetworkError;
+  }
+
+  uint8_t chunk[1024];
+  size_t copied = 0;
+  while (copied < expectedBytes) {
+    const size_t want = std::min(sizeof(chunk), expectedBytes - copied);
+    const size_t read = in.read(chunk, want);
+    if (read == 0) break;
+    out.write(chunk, read);
+    copied += read;
+  }
+  in.close();
+  out.close();
+
+  if (copied != expectedBytes) {
+    LOG_ERR("TSR", "Simulator frame is %zu bytes, expected %zu", copied, expectedBytes);
+    Storage.remove(destPath);
+    return Result::BadFrameSize;
+  }
+  return Result::Ok;
+}
 
 TesseraeClient::Result TesseraeClient::downloadFrame(const std::string& url, uint8_t* dest, const size_t capacity,
                                                      const size_t expectedBytes) {
@@ -79,9 +118,11 @@ TesseraeClient::Result TesseraeClient::downloadFrame(const std::string& url, uin
 
 #include <ArduinoJson.h>
 #include <HalPowerManager.h>
+#include <HalStorage.h>
 #include <Logging.h>
 #include <WiFi.h>
 
+#include <algorithm>
 #include <cstring>
 
 #include "esp_http_client.h"
@@ -89,13 +130,18 @@ TesseraeClient::Result TesseraeClient::downloadFrame(const std::string& url, uin
 
 namespace {
 
-// Server-side kind this device announces itself as. `xteink_x4` composes at
-// 480x800 portrait and packs at the 800x480 firmware-native stride, so the
-// dashboard is laid out the way the reader is actually held. Override at build
-// time for a panel this firmware also runs on but the catalog describes
-// separately (e.g. -DCROSSINK_TESSERAE_KIND='"xteink_x4_pro"').
+// Server-side kind this device announces itself as. Both variants compose at
+// 480x800 portrait and pack at the 800x480 firmware-native stride, so the
+// dashboard is laid out the way the reader is actually held; they differ only
+// in the renderer the SKU selects. Override at build time for a panel this
+// firmware also runs on but the catalog describes separately
+// (e.g. -DCROSSINK_TESSERAE_KIND='"xteink_x4_pro"').
 #ifndef CROSSINK_TESSERAE_KIND
+#ifdef CROSSINK_TESSERAE_GRAYSCALE
+#define CROSSINK_TESSERAE_KIND "xteink_x4_gray"
+#else
 #define CROSSINK_TESSERAE_KIND "xteink_x4"
+#endif
 #endif
 
 constexpr char TESSERAE_KIND[] = CROSSINK_TESSERAE_KIND;
@@ -332,6 +378,97 @@ TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool
     return Result::NetworkError;
   }
   return Result::Ok;
+}
+
+TesseraeClient::Result TesseraeClient::downloadFrameToFile(const std::string& url, const char* destPath,
+                                                           const size_t expectedBytes) {
+  if (destPath == nullptr) return Result::BadFrameSize;
+
+  WifiPowerSaveGuard powerSaveGuard;
+
+  // Land in a temp file and rename only once the full length has arrived, so a
+  // dropped connection can never replace a good cached frame with a torn one.
+  const std::string tempPath = std::string(destPath) + ".part";
+  Storage.remove(tempPath.c_str());
+
+  esp_http_client_config_t config = {};
+  config.url = url.c_str();
+  config.timeout_ms = REQUEST_TIMEOUT_MS;
+  config.buffer_size = HTTP_RX_BUFFER;
+  config.buffer_size_tx = HTTP_TX_BUFFER;
+  config.method = HTTP_METHOD_GET;
+
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  if (client == nullptr) {
+    LOG_ERR("TSR", "esp_http_client_init failed for artefact");
+    return Result::NetworkError;
+  }
+  esp_http_client_set_header(client, "User-Agent", "CrossInk-ESP32-" CROSSINK_VERSION);
+  esp_http_client_set_header(client, "Connection", "close");
+
+  Result result = Result::NetworkError;
+  const esp_err_t err = esp_http_client_open(client, 0);
+  if (err != ESP_OK) {
+    LOG_ERR("TSR", "Artefact connect failed: %s", esp_err_to_name(err));
+  } else {
+    const int contentLength = esp_http_client_fetch_headers(client);
+    const int status = esp_http_client_get_status_code(client);
+
+    if (status < 200 || status >= 300) {
+      LOG_ERR("TSR", "Artefact request returned HTTP %d", status);
+    } else if (contentLength > 0 && static_cast<size_t>(contentLength) != expectedBytes) {
+      LOG_ERR("TSR", "Frame declares %d bytes, expected %zu", contentLength, expectedBytes);
+      result = Result::BadFrameSize;
+    } else {
+      HalFile file;
+      if (!Storage.openFileForWrite("TSR", tempPath, file)) {
+        LOG_ERR("TSR", "Could not open %s for write", tempPath.c_str());
+      } else {
+        // 1 KB matches the HTTP receive buffer, so each read maps to roughly
+        // one socket read and one SD write without a large scratch allocation.
+        uint8_t chunk[1024];
+        size_t received = 0;
+        bool failed = false;
+        while (received < expectedBytes) {
+          const size_t want = std::min(sizeof(chunk), expectedBytes - received);
+          const int read = esp_http_client_read(client, reinterpret_cast<char*>(chunk), static_cast<int>(want));
+          if (read < 0) {
+            LOG_ERR("TSR", "Frame read error after %zu bytes", received);
+            failed = true;
+            break;
+          }
+          if (read == 0) break;  // peer closed
+          if (file.write(chunk, static_cast<size_t>(read)) != static_cast<size_t>(read)) {
+            LOG_ERR("TSR", "SD write failed at %zu bytes", received);
+            failed = true;
+            break;
+          }
+          received += static_cast<size_t>(read);
+        }
+        file.close();
+
+        if (failed) {
+          Storage.remove(tempPath.c_str());
+        } else if (received != expectedBytes) {
+          LOG_ERR("TSR", "Frame truncated: %zu of %zu bytes", received, expectedBytes);
+          Storage.remove(tempPath.c_str());
+          result = Result::BadFrameSize;
+        } else {
+          Storage.remove(destPath);
+          if (Storage.rename(tempPath.c_str(), destPath)) {
+            result = Result::Ok;
+          } else {
+            LOG_ERR("TSR", "Could not move frame into place");
+            Storage.remove(tempPath.c_str());
+          }
+        }
+      }
+    }
+  }
+
+  esp_http_client_close(client);
+  esp_http_client_cleanup(client);
+  return result;
 }
 
 TesseraeClient::Result TesseraeClient::postStatus() {

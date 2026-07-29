@@ -17,7 +17,21 @@ constexpr uint32_t TESSERAE_POLL_DEFAULT_S = 900;
 // Exact size of a native 1-bpp mono frame for the X4's 800x480 panel. The
 // Tesserae esp32_bw_bin renderer emits width*height/8 bytes, MSB-first,
 // bit-set = white, which is byte-identical to the CrossInk framebuffer.
-constexpr size_t TESSERAE_FRAME_BYTES = 48000;
+constexpr size_t TESSERAE_FRAME_BYTES_MONO = 48000;
+
+// 4-level grayscale frame from the esp32_gray2_bin renderer: width*height/4
+// bytes, 4 px/byte, MSB-first, 0b00 = black .. 0b11 = white. Same packing
+// GfxRenderer's own 2-bpp bitmap reader uses, so gray levels map straight onto
+// its GRAYSCALE_LSB / GRAYSCALE_MSB planes.
+constexpr size_t TESSERAE_FRAME_BYTES_GRAY = 96000;
+
+#ifdef CROSSINK_TESSERAE_GRAYSCALE
+constexpr bool TESSERAE_GRAYSCALE = true;
+constexpr size_t TESSERAE_FRAME_BYTES = TESSERAE_FRAME_BYTES_GRAY;
+#else
+constexpr bool TESSERAE_GRAYSCALE = false;
+constexpr size_t TESSERAE_FRAME_BYTES = TESSERAE_FRAME_BYTES_MONO;
+#endif
 
 // Last painted frame, kept so a 304 can repaint without re-downloading.
 // Unlike a wake-cycle client, this sleep screen cannot simply skip the paint on
@@ -41,6 +55,9 @@ class TesseraeStore : public PersistableStore<TesseraeStore> {
   std::string lastRenderId;  // ETag of the last painted frame
   uint32_t pollIntervalS = TESSERAE_POLL_DEFAULT_S;
   bool enabled = false;
+  // When set, every sleep asks the server to re-render rather than sending a
+  // conditional request. Costs a full download each time instead of a 304.
+  bool alwaysFresh = false;
   // Sleep screen to paint when the dashboard can't be fetched. Held here
   // rather than in CrossPointSettings so the binary settings layout is
   // untouched; stores a CrossPointSettings::SLEEP_SCREEN_MODE value.
@@ -63,6 +80,7 @@ class TesseraeStore : public PersistableStore<TesseraeStore> {
   uint32_t getPollIntervalS() const { return pollIntervalS; }
   bool isEnabled() const { return enabled; }
   uint8_t getFallbackSleepScreen() const { return fallbackSleepScreen; }
+  bool isAlwaysFresh() const { return alwaysFresh; }
 
   // True once we hold everything needed to call the authenticated endpoints.
   bool isPaired() const { return !serverUrl.empty() && !deviceId.empty() && !token.empty(); }
@@ -73,6 +91,7 @@ class TesseraeStore : public PersistableStore<TesseraeStore> {
   bool setLastRenderId(const std::string& renderId);
   bool setPollIntervalS(uint32_t seconds);
   bool setFallbackSleepScreen(uint8_t mode);
+  bool setAlwaysFresh(bool value);
   bool clearPairing();
 
   // Clamp a server-supplied cadence into the locally-enforced window.

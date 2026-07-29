@@ -56,6 +56,13 @@ class TesseraeClient {
   // fails with BadFrameSize unless exactly expectedBytes arrive.
   static Result downloadFrame(const std::string& url, uint8_t* dest, size_t capacity, size_t expectedBytes);
 
+  // GET <frame url> streamed to a file. Used for the 4-level grayscale frame,
+  // which is 96 KB and cannot be held in RAM alongside the framebuffer; the
+  // paint then reads it back a band at a time, once per plane. Writes to a
+  // temporary path and renames on success so a failed transfer can never leave
+  // a torn frame where a good one was.
+  static Result downloadFrameToFile(const std::string& url, const char* destPath, size_t expectedBytes);
+
   // POST /api/v1/device/<id>/status. Reports battery / RSSI / IP / fw_version
   // so the device shows as online in Tesserae, and stores the clamped
   // next_poll_s the server sends back.

@@ -6,6 +6,7 @@
 #include <HalClock.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Memory.h>
 #include <PNGdec.h>
 #include <Xtc.h>
 
@@ -25,6 +26,7 @@
 #include "RecentBooksStore.h"
 #include "SleepCoverAssets.h"
 #ifdef CROSSINK_TESSERAE
+#include "TesseraeFrame.h"
 #include "TesseraeStore.h"
 #include "network/TesseraeClient.h"
 #include "network/WifiAutoConnect.h"
@@ -759,61 +761,15 @@ void SleepActivity::renderDashboardSleepScreen() const {
 }
 
 #ifdef CROSSINK_TESSERAE
-namespace {
-
-// The cache is only meaningful alongside the render_id it was painted from:
-// without one there is nothing to send as If-None-Match, so a 304 can never
-// arrive and the cache can never be the thing that satisfies it.
-bool tesseraeFrameCacheIsUsable() {
-  if (TESSERAE_STORE.getLastRenderId().empty()) return false;
-  return Storage.exists(TESSERAE_FRAME_CACHE_PATH);
-}
-
-bool loadTesseraeFrameCache(uint8_t* dest, const size_t capacity) {
-  if (dest == nullptr || capacity < TESSERAE_FRAME_BYTES) return false;
-
-  HalFile file;
-  if (!Storage.openFileForRead("TSR", TESSERAE_FRAME_CACHE_PATH, file)) return false;
-  const size_t read = file.read(dest, TESSERAE_FRAME_BYTES);
-  file.close();
-
-  if (read != TESSERAE_FRAME_BYTES) {
-    LOG_ERR("TSR", "Cached frame is %zu bytes, expected %zu", read, TESSERAE_FRAME_BYTES);
-    return false;
-  }
-  return true;
-}
-
-void saveTesseraeFrameCache(const uint8_t* source, const size_t size) {
-  if (source == nullptr || size < TESSERAE_FRAME_BYTES) return;
-
-  HalFile file;
-  if (!Storage.openFileForWrite("TSR", TESSERAE_FRAME_CACHE_PATH, file)) {
-    LOG_ERR("TSR", "Could not open frame cache for write");
-    return;
-  }
-  const size_t written = file.write(source, TESSERAE_FRAME_BYTES);
-  file.close();
-
-  if (written != TESSERAE_FRAME_BYTES) {
-    // A short write would be indistinguishable from a good cache on the next
-    // read attempt's size check, but remove it anyway so the next sleep pays a
-    // download instead of reading a torn frame.
-    LOG_ERR("TSR", "Frame cache short write: %zu of %zu bytes", written, TESSERAE_FRAME_BYTES);
-    Storage.remove(TESSERAE_FRAME_CACHE_PATH);
-  }
-}
-
-}  // namespace
-
 // Paints a server-rendered Tesserae dashboard fetched on sleep entry.
 //
-// The frame arrives as the native 1-bpp mono buffer the esp32_bw_bin renderer
-// packs (MSB-first, bit-set = white) at the panel's native stride, which is
-// byte-identical to the CrossInk framebuffer, so a validated frame is a plain
-// copy with no decode step. The copy target is the renderer's framebuffer,
-// which HalDisplay owns, so the paint inherits the panel-controller detection
-// done in HalGPIO::begin() for free.
+// Fetching, caching and painting live in TesseraeFrame so this path and the
+// settings screen's preview cannot drift apart on wire size or paint sequence.
+// The frame is packed at the panel's native stride in a layout that matches
+// GfxRenderer's own conventions, so it needs no decode: mono is a copy into
+// the framebuffer, grayscale a base frame plus two planes. Either way the
+// target is the renderer's framebuffer, which HalDisplay owns, so the paint
+// inherits the panel-controller detection HalGPIO::begin() already did.
 //
 // Radio comes up only on this explicit sleep transition, never on a timer, and
 // goes down again before the refresh so the slow paint doesn't share the rail
@@ -826,13 +782,10 @@ void SleepActivity::renderTesseraeSleepScreen() const {
     return renderTesseraeFallbackSleepScreen();
   }
 
-  // The X3's 792x528 panel packs a different number of bytes, and no Tesserae
-  // SKU describes it yet. Bail before touching the radio rather than painting
-  // a frame at the wrong stride.
-  uint8_t* frameBuffer = renderer.getFrameBuffer();
-  const size_t bufferSize = renderer.getBufferSize();
-  if (frameBuffer == nullptr || bufferSize != TESSERAE_FRAME_BYTES) {
-    LOG_ERR("TSR", "Framebuffer is %zu bytes, Tesserae frame is %zu", bufferSize, TESSERAE_FRAME_BYTES);
+  // Bail on an unsupported panel before touching the radio rather than
+  // painting at the wrong stride.
+  if (!TesseraeFrame::panelIsSupported(renderer)) {
+    LOG_ERR("TSR", "Panel geometry cannot take a Tesserae frame");
     return renderTesseraeFallbackSleepScreen();
   }
 
@@ -855,22 +808,24 @@ void SleepActivity::renderTesseraeSleepScreen() const {
   // 304. Ask unconditionally otherwise, so an unchanged dashboard still yields
   // bytes to paint rather than a fallback screen. A refresh shortcut clears the
   // stored render_id, which lands here as "no cache, ask unconditionally".
-  const bool forceRefresh = !tesseraeFrameCacheIsUsable();
+  //
+  // Always Fresh forces it every time: the request carries ?button=refresh, so
+  // the server re-renders the current step with new widget data rather than
+  // answering 304 with whatever it last produced. Costs a full download on
+  // every sleep, which is why it is opt-in.
+  const bool forceRefresh = TESSERAE_STORE.isAlwaysFresh() || !TesseraeFrame::cacheIsUsable();
 
   TesseraeClient::FrameInfo frame;
   const TesseraeClient::Result frameResult = TesseraeClient::fetchFrameInfo(frame, forceRefresh);
 
   if (frameResult == TesseraeClient::Result::NotModified) {
-    // Biggest win in the loop: skips the 48 KB download and its radio airtime.
-    // The refresh itself is unavoidable here, since the panel is showing the
+    // Biggest win in the loop: skips the download and its radio airtime. The
+    // refresh itself is unavoidable here, since the panel is showing the
     // reader UI rather than the previous dashboard.
     LOG_INF("TSR", "Frame unchanged; repainting from cache");
     TesseraeClient::postStatus();
     WifiAutoConnect::disconnect();
-    if (loadTesseraeFrameCache(frameBuffer, bufferSize)) {
-      renderer.displayBuffer(HalDisplay::HALF_REFRESH, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH);
-      return;
-    }
+    if (TesseraeFrame::paint(renderer, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH)) return;
     LOG_ERR("TSR", "Cached frame unreadable; falling back");
     return renderTesseraeFallbackSleepScreen();
   }
@@ -881,32 +836,27 @@ void SleepActivity::renderTesseraeSleepScreen() const {
     return renderTesseraeFallbackSleepScreen();
   }
 
-  // Download straight into the framebuffer. A partial write leaves it dirty,
-  // but every fallback path clears the screen before drawing, so a failed
-  // fetch can't leak half a dashboard onto the panel.
-  const TesseraeClient::Result download =
-      TesseraeClient::downloadFrame(frame.url, frameBuffer, bufferSize, TESSERAE_FRAME_BYTES);
-
-  if (download == TesseraeClient::Result::Ok) {
+  const bool downloaded = TesseraeFrame::download(frame.url);
+  if (downloaded) {
     // Heartbeat while the radio is still up, before the slow refresh.
     TesseraeClient::postStatus();
   }
   WifiAutoConnect::disconnect();
 
-  if (download != TesseraeClient::Result::Ok) {
-    LOG_ERR("TSR", "Frame download failed: %s", TesseraeClient::resultToString(download));
+  if (!downloaded) {
     return renderTesseraeFallbackSleepScreen();
   }
 
-  // Cache before painting: if the write fails the frame still paints, it just
-  // costs a full download next time.
-  saveTesseraeFrameCache(frameBuffer, bufferSize);
-  TESSERAE_STORE.setLastRenderId(frame.renderId);
   LOG_INF("TSR", "Painting Tesserae frame %s", frame.renderId.c_str());
 
-  // Single HALF refresh, matching every other sleep screen: the OEM X4's only
-  // clean refresh in normal operation. See renderDefaultSleepScreen().
-  renderer.displayBuffer(HalDisplay::HALF_REFRESH, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH);
+  // Record the render_id only once the paint has actually worked, otherwise a
+  // failed composite would make the next sleep send an If-None-Match for a
+  // frame it never painted.
+  if (!TesseraeFrame::paint(renderer, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH)) {
+    LOG_ERR("TSR", "Frame paint failed; falling back");
+    return renderTesseraeFallbackSleepScreen();
+  }
+  TESSERAE_STORE.setLastRenderId(frame.renderId);
 }
 
 // Repaints whichever sleep screen the user had selected before switching to

@@ -8,6 +8,7 @@
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "TesseraeFrame.h"
 #include "TesseraeStore.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
@@ -18,14 +19,15 @@
 namespace {
 // Server URL, enable toggle, fallback screen, status, test now.
 // A paired device also gets "Forget pairing" (BASE_ITEMS + 1).
-constexpr int BASE_ITEMS = 5;
+constexpr int BASE_ITEMS = 6;
 
 constexpr int ITEM_URL = 0;
 constexpr int ITEM_ENABLED = 1;
-constexpr int ITEM_FALLBACK = 2;
-constexpr int ITEM_STATUS = 3;
-constexpr int ITEM_TEST = 4;
-constexpr int ITEM_UNPAIR = 5;
+constexpr int ITEM_ALWAYS_FRESH = 2;
+constexpr int ITEM_FALLBACK = 3;
+constexpr int ITEM_STATUS = 4;
+constexpr int ITEM_TEST = 5;
+constexpr int ITEM_UNPAIR = 6;
 
 // Sleep screens offered as the fallback. QUICK_RESUME and TESSERAE_SLEEP are
 // excluded: the first is a different sleep path entirely, the second would
@@ -182,32 +184,29 @@ void TesseraeSettingsActivity::runConnectionTest() {
     return;
   }
 
-  // Paint the real frame rather than just reporting success: it is the only way
-  // to confirm the panel geometry and orientation without waiting for a sleep.
-  // Downloading straight into the framebuffer costs no extra RAM; the settings
-  // list is redrawn from scratch when the preview is dismissed.
-  uint8_t* frameBuffer = renderer.getFrameBuffer();
-  const size_t bufferSize = renderer.getBufferSize();
-  if (frameBuffer == nullptr || bufferSize != TESSERAE_FRAME_BYTES) {
+  // Fetch and paint the real frame rather than just reporting success: it is
+  // the only way to confirm the panel geometry and orientation without waiting
+  // for a sleep. The frame lands on SD, so this costs no extra RAM and warms
+  // the same cache the sleep path uses.
+  if (!TesseraeFrame::panelIsSupported(renderer)) {
     WifiAutoConnect::disconnect();
-    LOG_ERR("TSR", "Framebuffer is %zu bytes, Tesserae frame is %zu", bufferSize, TESSERAE_FRAME_BYTES);
+    LOG_ERR("TSR", "Panel geometry cannot take a Tesserae frame");
     testMessage = tr(STR_TESSERAE_TEST_FAILED);
     requestUpdate();
     return;
   }
 
-  const TesseraeClient::Result download =
-      TesseraeClient::downloadFrame(frame.url, frameBuffer, bufferSize, TESSERAE_FRAME_BYTES);
+  const bool downloaded = TesseraeFrame::download(frame.url);
   WifiAutoConnect::disconnect();
 
-  if (download != TesseraeClient::Result::Ok) {
-    LOG_ERR("TSR", "Test frame download failed: %s", TesseraeClient::resultToString(download));
+  if (!downloaded) {
     testMessage = tr(STR_TESSERAE_TEST_FAILED);
     requestUpdate();
     return;
   }
 
   LOG_INF("TSR", "Test frame %s fetched; previewing", frame.renderId.c_str());
+  TESSERAE_STORE.setLastRenderId(frame.renderId);
   testMessage = tr(STR_TESSERAE_TEST_OK);
   previewActive = true;
   requestUpdate();
@@ -236,6 +235,10 @@ void TesseraeSettingsActivity::handleSelection() {
     }
     case ITEM_ENABLED:
       TESSERAE_STORE.setEnabled(!TESSERAE_STORE.isEnabled());
+      requestUpdate();
+      break;
+    case ITEM_ALWAYS_FRESH:
+      TESSERAE_STORE.setAlwaysFresh(!TESSERAE_STORE.isAlwaysFresh());
       requestUpdate();
       break;
     case ITEM_FALLBACK: {
@@ -275,11 +278,15 @@ void TesseraeSettingsActivity::handleSelection() {
 
 void TesseraeSettingsActivity::render(RenderLock&&) {
   if (previewActive) {
-    // The framebuffer already holds the fetched frame; clearing or drawing over
-    // it would destroy exactly what we want the user to look at. Same single
-    // HALF refresh the sleep screen uses, so the preview matches what a sleep
-    // will actually produce.
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    // Paint straight from the cached frame, through the same code the sleep
+    // screen uses, so the preview is exactly what a sleep will produce -- one
+    // HALF refresh for mono, a base frame plus two planes for grayscale.
+    // Nothing is drawn over it: the point is to look at the dashboard.
+    if (!TesseraeFrame::paint(renderer, /*turnOffScreen=*/false)) {
+      LOG_ERR("TSR", "Preview paint failed");
+      previewActive = false;
+      testMessage = tr(STR_TESSERAE_TEST_FAILED);
+    }
     return;
   }
 
@@ -296,9 +303,9 @@ void TesseraeSettingsActivity::render(RenderLock&&) {
   const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
   const int menuItems = getMenuItemCount();
 
-  static const StrId fieldNames[] = {StrId::STR_TESSERAE_SERVER_URL, StrId::STR_TESSERAE_ENABLE,
-                                     StrId::STR_TESSERAE_FALLBACK, StrId::STR_TESSERAE_STATUS,
-                                     StrId::STR_TESSERAE_TEST_NOW};
+  static const StrId fieldNames[] = {StrId::STR_TESSERAE_SERVER_URL,   StrId::STR_TESSERAE_ENABLE,
+                                     StrId::STR_TESSERAE_ALWAYS_FRESH, StrId::STR_TESSERAE_FALLBACK,
+                                     StrId::STR_TESSERAE_STATUS,       StrId::STR_TESSERAE_TEST_NOW};
 
   GUI.drawList(
       renderer, Rect{0, contentTop, pageWidth, contentHeight}, menuItems, static_cast<int>(selectedIndex),
@@ -314,6 +321,8 @@ void TesseraeSettingsActivity::render(RenderLock&&) {
                                                          : TESSERAE_STORE.getServerUrl();
           case ITEM_ENABLED:
             return TESSERAE_STORE.isEnabled() ? std::string(tr(STR_ENABLED)) : std::string(tr(STR_DISABLED));
+          case ITEM_ALWAYS_FRESH:
+            return TESSERAE_STORE.isAlwaysFresh() ? std::string(tr(STR_ENABLED)) : std::string(tr(STR_DISABLED));
           case ITEM_FALLBACK:
             return fallbackScreenText();
           case ITEM_STATUS:

@@ -34,6 +34,7 @@ void TesseraeStore::toJson(JsonDocument& doc) const {
   doc["pollIntervalS"] = pollIntervalS;
   doc["enabled"] = enabled;
   doc["fallbackSleepScreen"] = fallbackSleepScreen;
+  doc["alwaysFresh"] = alwaysFresh;
 }
 
 bool TesseraeStore::fromJson(JsonVariantConst doc) {
@@ -43,6 +44,7 @@ bool TesseraeStore::fromJson(JsonVariantConst doc) {
   pollIntervalS = clampPollIntervalS(doc["pollIntervalS"] | TESSERAE_POLL_DEFAULT_S);
   enabled = doc["enabled"] | false;
   fallbackSleepScreen = doc["fallbackSleepScreen"] | 0;
+  alwaysFresh = doc["alwaysFresh"] | false;
 
   obfuscation::DecodeStatus status = obfuscation::DecodeStatus::INVALID;
   token = obfuscation::deobfuscateFromBase64(doc["token_obf"] | "", &status);
@@ -111,6 +113,12 @@ bool TesseraeStore::setPollIntervalS(const uint32_t seconds) {
 bool TesseraeStore::setFallbackSleepScreen(const uint8_t mode) {
   if (fallbackSleepScreen == mode) return true;
   fallbackSleepScreen = mode;
+  return saveToFile();
+}
+
+bool TesseraeStore::setAlwaysFresh(const bool value) {
+  if (alwaysFresh == value) return true;
+  alwaysFresh = value;
   return saveToFile();
 }
 
