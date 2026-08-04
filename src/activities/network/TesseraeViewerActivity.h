@@ -36,8 +36,11 @@ class TesseraeViewerActivity final : public Activity {
   std::string message;
   bool fetchPending = false;
   bool tookWifiUp = false;
+  const char* pendingButton = nullptr;  // string literal, so no ownership
 
-  void fetchAndPaint();
+  // nullptr refreshes the current step; "left" / "right" step a bound
+  // rotation, which the server resolves from its own button map.
+  void fetchAndPaint(const char* buttonName = nullptr);
   void showMessage(const char* text);
 };
 

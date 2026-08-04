@@ -40,7 +40,9 @@ const char* TesseraeClient::resultToString(const Result result) {
 
 TesseraeClient::Result TesseraeClient::discover() { return Result::Ok; }
 
-TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool forceRefresh) {
+TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool forceRefresh,
+                                                     const char* buttonName) {
+  (void)buttonName;
   out.url = "/tesserae_frame.bin";
   out.renderId = "simulator";
   out.format = "bin";
@@ -337,7 +339,8 @@ TesseraeClient::Result TesseraeClient::discover() {
   return Result::Ok;
 }
 
-TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool forceRefresh) {
+TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool forceRefresh,
+                                                     const char* buttonName) {
   if (!TESSERAE_STORE.isEnabled() || TESSERAE_STORE.getServerUrl().empty()) return Result::NoConfig;
   if (!TESSERAE_STORE.isPaired()) return Result::NotPaired;
 
@@ -346,17 +349,18 @@ TesseraeClient::Result TesseraeClient::fetchFrameInfo(FrameInfo& out, const bool
   std::string url = TESSERAE_STORE.getServerUrl() + "/api/v1/device/" + TESSERAE_STORE.getDeviceId() + "/frame";
   const std::string& cachedRenderId = TESSERAE_STORE.getLastRenderId();
 
-  // A forced refresh is a user-initiated request for the newest frame, which is
-  // exactly what the protocol's `refresh` button action means. Reporting it
-  // lets the server dispatch any bound action before it picks the frame, so the
-  // artefact we get back already reflects the press.
-  if (forceRefresh) {
-    url += "?button=refresh";
+  // Report the button so the server can dispatch its bound action before
+  // picking the frame, and the artefact already reflects the press. A forced
+  // refresh with no explicit button is the protocol's `refresh` action.
+  const bool reportButton = buttonName != nullptr || forceRefresh;
+  if (reportButton) {
+    url += "?button=";
+    url += (buttonName != nullptr) ? buttonName : "refresh";
   }
 
   Response response;
   if (!performJsonRequest(url, "", TESSERAE_STORE.getToken().c_str(),
-                          forceRefresh ? nullptr : cachedRenderId.c_str(), response)) {
+                          reportButton ? nullptr : cachedRenderId.c_str(), response)) {
     return Result::NetworkError;
   }
 

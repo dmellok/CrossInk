@@ -48,7 +48,7 @@ void TesseraeViewerActivity::showMessage(const char* text) {
 // path's forced-refresh behaviour: the request carries ?button=refresh, so what
 // comes back reflects current widget data rather than whatever was last
 // rendered.
-void TesseraeViewerActivity::fetchAndPaint() {
+void TesseraeViewerActivity::fetchAndPaint(const char* buttonName) {
   fetchPending = false;
 
   if (TESSERAE_STORE.getServerUrl().empty()) {
@@ -83,7 +83,7 @@ void TesseraeViewerActivity::fetchAndPaint() {
   }
 
   TesseraeClient::FrameInfo frame;
-  const TesseraeClient::Result result = TesseraeClient::fetchFrameInfo(frame, /*forceRefresh=*/true);
+  const TesseraeClient::Result result = TesseraeClient::fetchFrameInfo(frame, /*forceRefresh=*/true, buttonName);
   if (result != TesseraeClient::Result::Ok) {
     LOG_INF("TSR", "No frame to show: %s", TesseraeClient::resultToString(result));
     showMessage(tr(STR_TESSERAE_TEST_FAILED));
@@ -112,7 +112,8 @@ void TesseraeViewerActivity::loop() {
   if (fetchPending) {
     // Paint the "contacting" message before blocking on the radio.
     requestUpdateAndWait();
-    fetchAndPaint();
+    fetchAndPaint(pendingButton);
+    pendingButton = nullptr;
     return;
   }
 
@@ -121,7 +122,21 @@ void TesseraeViewerActivity::loop() {
     return;
   }
 
+  // Select re-renders what is showing. Up and Down step a rotation bound to
+  // this device server-side; with no rotation bound the server has nothing to
+  // step and simply returns the current frame, so the buttons are harmless
+  // rather than needing to be hidden.
+  const char* button = nullptr;
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    button = "refresh";
+  } else if (mappedInput.wasPressed(MappedInputManager::Button::Up)) {
+    button = "left";
+  } else if (mappedInput.wasPressed(MappedInputManager::Button::Down)) {
+    button = "right";
+  }
+
+  if (button != nullptr) {
+    pendingButton = button;
     fetchPending = true;
     showMessage(tr(STR_TESSERAE_TESTING));
     requestUpdate();
@@ -150,7 +165,8 @@ void TesseraeViewerActivity::render(RenderLock&&) {
                  tr(STR_TESSERAE_DASHBOARD));
   renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2, message.c_str());
 
-  const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_TESSERAE_REFRESH), "", "");
+  const auto labels =
+      mappedInput.mapLabels(tr(STR_BACK), tr(STR_TESSERAE_REFRESH), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();

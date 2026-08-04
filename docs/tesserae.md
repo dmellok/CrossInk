@@ -58,7 +58,15 @@ Pairing is zero-touch and covers MAC auto-claim, so a reflash silently re-acquir
 | Test now | Fetch and preview a real frame without waiting for a sleep. |
 | Forget pairing | Shown only when paired. |
 
-**View dashboard** opens the dashboard full-screen while the reader is awake, rather than waiting for a sleep. It paints the cached frame straight away, which costs no radio time, and only goes to the network when you press Select to refresh. Back exits.
+**View dashboard** opens the dashboard full-screen while the reader is awake, rather than waiting for a sleep. It paints the cached frame straight away, which costs no radio time, and only goes to the network when you ask it to.
+
+| Button | In the viewer |
+|---|---|
+| Select | Re-render the current dashboard |
+| Up / Down | Step backwards / forwards through a bound rotation |
+| Back | Exit |
+
+Up and Down report `left` / `right` to the server, which its default button map binds to the previous and next step of a rotation. With no rotation bound to the device the server has nothing to step and returns the current frame, so the buttons do no harm.
 
 Two power-button shortcuts are available under *Settings → Controls*:
 

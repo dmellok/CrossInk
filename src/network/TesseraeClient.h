@@ -50,7 +50,13 @@ class TesseraeClient {
 
   // GET /api/v1/device/<id>/frame. Sends If-None-Match when a cached
   // render_id exists unless forceRefresh is set.
-  static Result fetchFrameInfo(FrameInfo& out, bool forceRefresh = false);
+  //
+  // buttonName reports a physical button press, which the server dispatches
+  // before it picks the frame, so what comes back already reflects the press.
+  // The conventional names are "refresh", "left" and "right"; the default map
+  // binds left/right to the previous/next step of a bound rotation. Passing a
+  // name implies an unconditional request, since a 304 would defeat the point.
+  static Result fetchFrameInfo(FrameInfo& out, bool forceRefresh = false, const char* buttonName = nullptr);
 
   // GET <frame url> straight into dest. Requires capacity >= expectedBytes and
   // fails with BadFrameSize unless exactly expectedBytes arrive.
