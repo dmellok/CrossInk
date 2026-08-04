@@ -79,14 +79,16 @@ The frame length is validated against the exact expected byte count before anyth
 | Device | Panel | Mono frame | Grayscale frame | Status |
 |---|---|---|---|---|
 | Xteink X4 | 800×480 | 48,000 B | 96,000 B | Working. Confirmed on hardware, both modes. |
-| Xteink X3 | 792×528 | 52,272 B | 104,544 B | Implemented, **untested**. See below. |
+| Xteink X3 | 792×528 | 52,272 B | 104,544 B | Working. Confirmed on hardware in grayscale. |
 | Xteink X4 Pro | 800×480 | 48,000 B | 96,000 B | Untested. Same panel and controller as the X4, so it should work. |
 
 Frame sizes are read from the live panel rather than baked in, and the announced kind is resolved at runtime from the X3/X4 probe `HalGPIO::begin()` already does. One binary drives both, so nothing needs selecting at build time.
 
 Server-side SKUs are `xteink_x4`, `xteink_x4_gray`, `xteink_x3`, `xteink_x3_gray` and `xteink_x4_pro`.
 
-**On the X3 specifically:** nobody has tested this. Two things are inherited assumptions rather than measurements. `portrait_flipped` is carried over from the X4, but the X3 uses a different controller family (UC8253 / UC8279d rather than SSD1677) and its framebuffer scan origin may not match; if a dashboard renders upside-down, switch the SKU to `portrait`. And `esp32_gray2_bin` is documented as targeting UC8179-class panels in their 4-gray mode, so grayscale on an X3 is the less certain of the two. Mono is the safer starting point.
+**On the X3 specifically:** confirmed working in grayscale on a UC8279d unit. Two things that were inherited guesses are now measured: `portrait_flipped` is correct despite the different controller family, and `esp32_gray2_bin` drives UC8253 / UC8279d silicon even though it is written for UC8179-class panels. The X3 needs the OEM preconditioning settle pass between the base frame and the planes, which the firmware issues unconditionally since it is a no-op on the X4.
+
+Two gaps remain. The **mono** path has not run on an X3, only grayscale; it is the same frame at half the size through a renderer already confirmed on the X4, so the risk is small but non-zero. And only the **UC8279d** production run has been seen working; earlier X3s ship a UC8253, which the firmware detects at boot and feeds the same buffer.
 
 ## Not built yet
 

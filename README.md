@@ -23,7 +23,7 @@ The upside beyond battery: it inherits the firmware's existing panel-controller 
 | Device | Panel | Status |
 |---|---|---|
 | Xteink X4 | 800×480 | Working, confirmed on hardware in mono and 4-level grayscale |
-| Xteink X3 | 792×528 | Implemented, untested. Start in mono |
+| Xteink X3 | 792×528 | Working, confirmed on hardware in 4-level grayscale |
 | Xteink X4 Pro | 800×480 | Untested. Same panel and controller as the X4 |
 
 One binary drives X3 and X4; the panel is detected at boot and the reader registers itself as the matching Tesserae device automatically.
@@ -102,7 +102,6 @@ Full detail, including the wire formats and the refresh semantics, is in **[docs
 - No touch. Tesserae's protocol supports it, the X4 has no digitiser
 - Only zero-touch pairing is built; the 6-digit pairing-code path is not
 - Battery impact over weeks of real use is unmeasured
-- X3 support is written but has never run on an X3
 
 ## Not going upstream
 
