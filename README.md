@@ -71,7 +71,7 @@ Pairing is zero-touch and covers MAC auto-claim, so reflashing silently re-acqui
     </td>
     <td align="center" width="50%">
       <img src="./docs/images/tesserae/settings.png" alt="The Tesserae Dashboard settings screen showing server URL, toggles, pairing status and Test now" width="300" /><br/>
-      <em>Tesserae Dashboard</em>
+      <em>Tesserae Dashboard <sub>(screenshot predates the Refresh style row)</sub></em>
     </td>
   </tr>
 </table>

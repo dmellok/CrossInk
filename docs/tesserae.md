@@ -48,6 +48,8 @@ Pairing is zero-touch and covers MAC auto-claim, so a reflash silently re-acquir
   <img src="./images/tesserae/settings.png" alt="The Tesserae Dashboard settings screen" width="300" />
 </p>
 
+> This screenshot predates the `Refresh style` row and shows seven options rather than eight. The table below is current.
+
 | Setting | Meaning |
 |---|---|
 | Server URL | Tesserae base URL. Changing it drops the stored pairing, since the token belongs to the server that issued it. |
