@@ -2,7 +2,9 @@
 
 Paint a server-rendered [Tesserae](https://github.com/dmellok/tesserae) dashboard as your Xteink e-reader's sleep screen.
 
-<!-- SCREENSHOT: docs/images/tesserae/dashboard.jpg -->
+<p align="center">
+  <img src="./docs/images/tesserae/dashboard.png" alt="A Tesserae dashboard painted on an Xteink X4: weather, five-day forecast and live train departures" width="330" />
+</p>
 
 A fork of [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk) that adds a Tesserae client. Everything sits behind `-DCROSSINK_TESSERAE`, so it compiles out completely and the reader is unchanged without it.
 
@@ -60,6 +62,19 @@ Pairing is zero-touch and covers MAC auto-claim, so reflashing silently re-acqui
 ## Settings
 
 **Settings → System → Tesserae Dashboard**
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="./docs/images/tesserae/settings-menu.png" alt="Settings, System tab, with Tesserae Dashboard highlighted" width="300" /><br/>
+      <em>Settings &rarr; System</em>
+    </td>
+    <td align="center" width="50%">
+      <img src="./docs/images/tesserae/settings.png" alt="The Tesserae Dashboard settings screen showing server URL, toggles, pairing status and Test now" width="300" /><br/>
+      <em>Tesserae Dashboard</em>
+    </td>
+  </tr>
+</table>
 
 | Setting | What it does |
 |---|---|

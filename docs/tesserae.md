@@ -7,6 +7,10 @@ nav_order: 16
 
 Paints a server-rendered [Tesserae](https://github.com/dmellok/tesserae) dashboard as the reader's sleep screen.
 
+<p align="center">
+  <img src="./images/tesserae/dashboard.png" alt="A Tesserae dashboard painted on an Xteink X4" width="300" />
+</p>
+
 This lives on the `tesserae-client` branch only and is not upstream. See the note at the top of the [README](../README.md) for why.
 
 ## How it works
@@ -39,6 +43,10 @@ Both formats are packed exactly the way `GfxRenderer` already reads bitmaps, so 
 Pairing is zero-touch and covers MAC auto-claim, so a reflash silently re-acquires the existing pairing.
 
 ## Settings
+
+<p align="center">
+  <img src="./images/tesserae/settings.png" alt="The Tesserae Dashboard settings screen" width="300" />
+</p>
 
 | Setting | Meaning |
 |---|---|
