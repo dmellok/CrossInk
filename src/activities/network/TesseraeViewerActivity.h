@@ -42,6 +42,7 @@ class TesseraeViewerActivity final : public Activity {
   // rotation, which the server resolves from its own button map.
   void fetchAndPaint(const char* buttonName = nullptr);
   void showMessage(const char* text);
+  void reportStep(const char* text);
 };
 
 #endif  // CROSSINK_TESSERAE

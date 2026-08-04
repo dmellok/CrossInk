@@ -20,16 +20,17 @@
 namespace {
 // Server URL, enable toggle, fallback screen, status, test now.
 // A paired device also gets "Forget pairing" (BASE_ITEMS + 1).
-constexpr int BASE_ITEMS = 7;
+constexpr int BASE_ITEMS = 8;
 
 constexpr int ITEM_URL = 0;
 constexpr int ITEM_ENABLED = 1;
 constexpr int ITEM_ALWAYS_FRESH = 2;
-constexpr int ITEM_FALLBACK = 3;
-constexpr int ITEM_STATUS = 4;
-constexpr int ITEM_VIEW = 5;
-constexpr int ITEM_TEST = 6;
-constexpr int ITEM_UNPAIR = 7;
+constexpr int ITEM_REFRESH_STYLE = 3;
+constexpr int ITEM_FALLBACK = 4;
+constexpr int ITEM_STATUS = 5;
+constexpr int ITEM_VIEW = 6;
+constexpr int ITEM_TEST = 7;
+constexpr int ITEM_UNPAIR = 8;
 
 // Sleep screens offered as the fallback. QUICK_RESUME and TESSERAE_SLEEP are
 // excluded: the first is a different sleep path entirely, the second would
@@ -47,6 +48,18 @@ constexpr uint8_t FALLBACK_MODES[] = {
     static_cast<uint8_t>(CrossPointSettings::BLANK),
 };
 constexpr size_t FALLBACK_MODE_COUNT = sizeof(FALLBACK_MODES) / sizeof(FALLBACK_MODES[0]);
+
+StrId refreshStyleLabel(const TesseraeRefreshStyle style) {
+  switch (style) {
+    case TesseraeRefreshStyle::Verbose:
+      return StrId::STR_TESSERAE_STYLE_VERBOSE;
+    case TesseraeRefreshStyle::KeepCurrent:
+      return StrId::STR_TESSERAE_STYLE_KEEP;
+    case TesseraeRefreshStyle::Simple:
+    default:
+      return StrId::STR_TESSERAE_STYLE_SIMPLE;
+  }
+}
 
 StrId fallbackModeLabel(const uint8_t mode) {
   switch (mode) {
@@ -243,6 +256,13 @@ void TesseraeSettingsActivity::handleSelection() {
       TESSERAE_STORE.setAlwaysFresh(!TESSERAE_STORE.isAlwaysFresh());
       requestUpdate();
       break;
+    case ITEM_REFRESH_STYLE: {
+      const auto next = static_cast<TesseraeRefreshStyle>(
+          (static_cast<uint8_t>(TESSERAE_STORE.getRefreshStyle()) + 1) % TESSERAE_REFRESH_STYLE_COUNT);
+      TESSERAE_STORE.setRefreshStyle(next);
+      requestUpdate();
+      break;
+    }
     case ITEM_FALLBACK: {
       const uint8_t current = TESSERAE_STORE.getFallbackSleepScreen();
       size_t index = 0;
@@ -310,8 +330,9 @@ void TesseraeSettingsActivity::render(RenderLock&&) {
   const int menuItems = getMenuItemCount();
 
   static const StrId fieldNames[] = {StrId::STR_TESSERAE_SERVER_URL,   StrId::STR_TESSERAE_ENABLE,
-                                     StrId::STR_TESSERAE_ALWAYS_FRESH, StrId::STR_TESSERAE_FALLBACK,
-                                     StrId::STR_TESSERAE_STATUS,       StrId::STR_TESSERAE_VIEW,
+                                     StrId::STR_TESSERAE_ALWAYS_FRESH,
+                                     StrId::STR_TESSERAE_REFRESH_STYLE, StrId::STR_TESSERAE_FALLBACK,
+                                     StrId::STR_TESSERAE_STATUS,        StrId::STR_TESSERAE_VIEW,
                                      StrId::STR_TESSERAE_TEST_NOW};
 
   GUI.drawList(
@@ -330,6 +351,8 @@ void TesseraeSettingsActivity::render(RenderLock&&) {
             return TESSERAE_STORE.isEnabled() ? std::string(tr(STR_ENABLED)) : std::string(tr(STR_DISABLED));
           case ITEM_ALWAYS_FRESH:
             return TESSERAE_STORE.isAlwaysFresh() ? std::string(tr(STR_ENABLED)) : std::string(tr(STR_DISABLED));
+          case ITEM_REFRESH_STYLE:
+            return std::string(I18N.get(refreshStyleLabel(TESSERAE_STORE.getRefreshStyle())));
           case ITEM_FALLBACK:
             return fallbackScreenText();
           case ITEM_STATUS:

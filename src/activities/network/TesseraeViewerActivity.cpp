@@ -44,6 +44,16 @@ void TesseraeViewerActivity::showMessage(const char* text) {
   message = text != nullptr ? text : "";
 }
 
+// Narrate a step of the fetch. Verbose paints each one as it happens, which
+// costs a fast refresh apiece but makes a slow or stuck fetch legible. Simple
+// leaves the single message already on screen. Keep current draws nothing at
+// all, so the dashboard stays up until the new frame replaces it.
+void TesseraeViewerActivity::reportStep(const char* text) {
+  if (TESSERAE_STORE.getRefreshStyle() != TesseraeRefreshStyle::Verbose) return;
+  showMessage(text);
+  requestUpdateAndWait();
+}
+
 // Connect, ask the server to re-render, download and paint. Mirrors the sleep
 // path's forced-refresh behaviour: the request carries ?button=refresh, so what
 // comes back reflects current widget data rather than whatever was last
@@ -64,6 +74,7 @@ void TesseraeViewerActivity::fetchAndPaint(const char* buttonName) {
     return;
   }
 
+  reportStep(tr(STR_TESSERAE_STEP_WIFI));
   if (!WifiAutoConnect::connect()) {
     showMessage(tr(STR_TESSERAE_NO_WIFI));
     requestUpdate();
@@ -72,6 +83,7 @@ void TesseraeViewerActivity::fetchAndPaint(const char* buttonName) {
   tookWifiUp = true;
 
   if (!TESSERAE_STORE.isPaired()) {
+    reportStep(tr(STR_TESSERAE_STEP_PAIRING));
     const TesseraeClient::Result discovery = TesseraeClient::discover();
     if (discovery != TesseraeClient::Result::Ok) {
       LOG_INF("TSR", "Pairing incomplete: %s", TesseraeClient::resultToString(discovery));
@@ -82,6 +94,7 @@ void TesseraeViewerActivity::fetchAndPaint(const char* buttonName) {
     }
   }
 
+  reportStep(tr(STR_TESSERAE_STEP_FRAME));
   TesseraeClient::FrameInfo frame;
   const TesseraeClient::Result result = TesseraeClient::fetchFrameInfo(frame, /*forceRefresh=*/true, buttonName);
   if (result != TesseraeClient::Result::Ok) {
@@ -91,6 +104,7 @@ void TesseraeViewerActivity::fetchAndPaint(const char* buttonName) {
     return;
   }
 
+  reportStep(tr(STR_TESSERAE_STEP_DOWNLOAD));
   if (!TesseraeFrame::download(frame.url)) {
     showMessage(tr(STR_TESSERAE_TEST_FAILED));
     requestUpdate();
@@ -102,6 +116,7 @@ void TesseraeViewerActivity::fetchAndPaint(const char* buttonName) {
   WifiAutoConnect::disconnect();
   tookWifiUp = false;
 
+  reportStep(tr(STR_TESSERAE_STEP_PAINT));
   TESSERAE_STORE.setLastRenderId(frame.renderId);
   LOG_INF("TSR", "Showing Tesserae frame %s", frame.renderId.c_str());
   state = State::Painted;
@@ -138,6 +153,14 @@ void TesseraeViewerActivity::loop() {
   if (button != nullptr) {
     pendingButton = button;
     fetchPending = true;
+    if (TESSERAE_STORE.getRefreshStyle() == TesseraeRefreshStyle::KeepCurrent && state == State::Painted) {
+      // Leave the dashboard on the panel and fetch underneath it. loop() blocks
+      // through the fetch, so nothing repaints until the new frame is ready.
+      fetchAndPaint(pendingButton);
+      pendingButton = nullptr;
+      fetchPending = false;
+      return;
+    }
     showMessage(tr(STR_TESSERAE_TESTING));
     requestUpdate();
   }
@@ -166,7 +189,7 @@ void TesseraeViewerActivity::render(RenderLock&&) {
   renderer.drawCenteredText(UI_12_FONT_ID, pageHeight / 2, message.c_str());
 
   const auto labels =
-      mappedInput.mapLabels(tr(STR_BACK), tr(STR_TESSERAE_REFRESH), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+      mappedInput.mapLabels(tr(STR_BACK), tr(STR_REFRESH), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();

@@ -6,6 +6,7 @@
 - 4-level grayscale dashboards, so photos and shading render properly instead of being flattened to black and white.
 - Tesserae Dashboard settings screen (Settings > System) with server URL, an enable toggle, `Always fetch fresh`, a fallback sleep screen, pairing status, and a `Test now` action that fetches and previews a real frame on the panel.
 - `View dashboard`, which opens the dashboard full-screen while the reader is awake. The cached frame appears instantly without using WiFi; Select re-renders it, and Up/Down page through a rotation if one is bound to the reader in Tesserae. Available from the Tesserae settings screen and as a button shortcut.
+- `Refresh style` setting for the dashboard viewer: `Verbose` narrates each step while it connects, fetches and paints, `Simple` shows a single message, and `Keep current` leaves the dashboard on screen until the new one is ready.
 - `Refresh Dashboard` button shortcut, which discards the cached frame so the next sleep asks the server for a freshly rendered one.
 - Dashboards are cached on the SD card, so an unchanged dashboard repaints without re-downloading it.
 - Pairing is zero-touch: the reader announces itself and you approve it once in Tesserae. A reflashed device silently re-acquires its existing pairing by MAC.

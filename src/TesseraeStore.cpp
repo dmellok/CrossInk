@@ -40,6 +40,7 @@ void TesseraeStore::toJson(JsonDocument& doc) const {
   doc["enabled"] = enabled;
   doc["fallbackSleepScreen"] = fallbackSleepScreen;
   doc["alwaysFresh"] = alwaysFresh;
+  doc["refreshStyle"] = refreshStyle;
 }
 
 bool TesseraeStore::fromJson(JsonVariantConst doc) {
@@ -50,6 +51,8 @@ bool TesseraeStore::fromJson(JsonVariantConst doc) {
   enabled = doc["enabled"] | false;
   fallbackSleepScreen = doc["fallbackSleepScreen"] | 0;
   alwaysFresh = doc["alwaysFresh"] | false;
+  refreshStyle = doc["refreshStyle"] | static_cast<uint8_t>(TesseraeRefreshStyle::Simple);
+  if (refreshStyle >= TESSERAE_REFRESH_STYLE_COUNT) refreshStyle = static_cast<uint8_t>(TesseraeRefreshStyle::Simple);
 
   obfuscation::DecodeStatus status = obfuscation::DecodeStatus::INVALID;
   token = obfuscation::deobfuscateFromBase64(doc["token_obf"] | "", &status);
@@ -124,6 +127,13 @@ bool TesseraeStore::setFallbackSleepScreen(const uint8_t mode) {
 bool TesseraeStore::setAlwaysFresh(const bool value) {
   if (alwaysFresh == value) return true;
   alwaysFresh = value;
+  return saveToFile();
+}
+
+bool TesseraeStore::setRefreshStyle(const TesseraeRefreshStyle style) {
+  const uint8_t value = static_cast<uint8_t>(style);
+  if (refreshStyle == value) return true;
+  refreshStyle = value;
   return saveToFile();
 }
 

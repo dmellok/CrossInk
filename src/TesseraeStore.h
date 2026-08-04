@@ -14,6 +14,14 @@ constexpr uint32_t TESSERAE_POLL_MIN_S = 30;
 constexpr uint32_t TESSERAE_POLL_MAX_S = 604800;  // 7 days
 constexpr uint32_t TESSERAE_POLL_DEFAULT_S = 900;
 
+// How the viewer behaves while it fetches a new dashboard.
+enum class TesseraeRefreshStyle : uint8_t {
+  Verbose = 0,     // name each step as it happens
+  Simple = 1,      // one "contacting server" message
+  KeepCurrent = 2  // leave the dashboard up until the new frame lands
+};
+constexpr uint8_t TESSERAE_REFRESH_STYLE_COUNT = 3;
+
 #ifdef CROSSINK_TESSERAE_GRAYSCALE
 constexpr bool TESSERAE_GRAYSCALE = true;
 #else
@@ -59,6 +67,7 @@ class TesseraeStore : public PersistableStore<TesseraeStore> {
   // When set, every sleep asks the server to re-render rather than sending a
   // conditional request. Costs a full download each time instead of a 304.
   bool alwaysFresh = false;
+  uint8_t refreshStyle = static_cast<uint8_t>(TesseraeRefreshStyle::Simple);
   // Sleep screen to paint when the dashboard can't be fetched. Held here
   // rather than in CrossPointSettings so the binary settings layout is
   // untouched; stores a CrossPointSettings::SLEEP_SCREEN_MODE value.
@@ -82,6 +91,7 @@ class TesseraeStore : public PersistableStore<TesseraeStore> {
   bool isEnabled() const { return enabled; }
   uint8_t getFallbackSleepScreen() const { return fallbackSleepScreen; }
   bool isAlwaysFresh() const { return alwaysFresh; }
+  TesseraeRefreshStyle getRefreshStyle() const { return static_cast<TesseraeRefreshStyle>(refreshStyle); }
 
   // True once we hold everything needed to call the authenticated endpoints.
   bool isPaired() const { return !serverUrl.empty() && !deviceId.empty() && !token.empty(); }
@@ -93,6 +103,7 @@ class TesseraeStore : public PersistableStore<TesseraeStore> {
   bool setPollIntervalS(uint32_t seconds);
   bool setFallbackSleepScreen(uint8_t mode);
   bool setAlwaysFresh(bool value);
+  bool setRefreshStyle(TesseraeRefreshStyle style);
   bool clearPairing();
 
   // Clamp a server-supplied cadence into the locally-enforced window.

@@ -53,6 +53,7 @@ Pairing is zero-touch and covers MAC auto-claim, so a reflash silently re-acquir
 | Server URL | Tesserae base URL. Changing it drops the stored pairing, since the token belongs to the server that issued it. |
 | Use as sleep screen | Master enable. |
 | Always fetch fresh | Force a server-side re-render on every sleep instead of a conditional request. Off by default: it costs a full download each time rather than a 304. |
+| Refresh style | What the viewer shows while it fetches. `Verbose` names each step, `Simple` shows one message, `Keep current` leaves the dashboard up until the new frame lands. |
 | Fallback screen | What to paint when the dashboard can't be fetched. |
 | Status | Not Set / Not paired / Approve in Tesserae / Paired. |
 | Test now | Fetch and preview a real frame without waiting for a sleep. |
