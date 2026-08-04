@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- Xteink X3 readers now receive a dashboard packed for their own 792x528 panel instead of the X4's, which was rejected before painting. Frame sizes and the panel reported at pairing are read from the live display, and the reader registers itself as the matching Tesserae device automatically.
 - Saved WiFi credentials are now loaded by any consumer that needs them, not only by the WiFi settings screen.
 
 ## [v1.4.0.1] - 2026-07-28

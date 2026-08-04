@@ -106,6 +106,10 @@ bool paintGrayscale(GfxRenderer& renderer, uint8_t* frameBuffer, const bool turn
   if (!buildGrayPlane(frameBuffer, panelWidth, panelHeight, GrayPlane::BwBase, band.get(), bandRows)) return false;
   renderer.displayGrayscaleBase(HalDisplay::FULL_REFRESH);
 
+  // X3 needs the OEM settle pass between the base frame and the planes; it is a
+  // no-op on X4, so calling it unconditionally is correct for both.
+  renderer.preconditionGrayscale();
+
   // Past this point the base frame is already on the panel, so a failure
   // leaves a readable 1-bit version rather than a broken screen.
   if (!buildGrayPlane(frameBuffer, panelWidth, panelHeight, GrayPlane::Lsb, band.get(), bandRows)) {
@@ -130,11 +134,12 @@ bool paintMono(GfxRenderer& renderer, uint8_t* frameBuffer, const size_t bufferS
                const bool turnOffScreen) {
   HalFile file;
   if (!Storage.openFileForRead("TSR", TESSERAE_FRAME_CACHE_PATH, file)) return false;
-  const size_t read = file.read(frameBuffer, std::min(bufferSize, TESSERAE_FRAME_BYTES_MONO));
+  const size_t expected = tesseraeMonoFrameBytes();
+  const size_t read = file.read(frameBuffer, std::min(bufferSize, expected));
   file.close();
 
-  if (read != TESSERAE_FRAME_BYTES_MONO) {
-    LOG_ERR("TSR", "Cached frame is %zu bytes, expected %zu", read, TESSERAE_FRAME_BYTES_MONO);
+  if (read != expected) {
+    LOG_ERR("TSR", "Cached frame is %zu bytes, expected %zu", read, expected);
     return false;
   }
 
@@ -147,8 +152,14 @@ bool paintMono(GfxRenderer& renderer, uint8_t* frameBuffer, const size_t bufferS
 
 }  // namespace
 
+// Any panel whose width packs to whole bytes works: the frame is unpacked at
+// the panel's own stride, so 800x480 and the X3's 792x528 are both fine. The
+// width check matters because a width that is not a multiple of 8 would need
+// row padding, which the wire format does not have.
 bool TesseraeFrame::panelIsSupported(const GfxRenderer& renderer) {
-  return renderer.getFrameBuffer() != nullptr && renderer.getBufferSize() == TESSERAE_FRAME_BYTES_MONO;
+  if (renderer.getFrameBuffer() == nullptr) return false;
+  const uint16_t width = renderer.getDisplayWidth();
+  return width > 0 && (width % 8) == 0 && renderer.getBufferSize() > 0;
 }
 
 bool TesseraeFrame::cacheIsUsable() {
@@ -158,7 +169,7 @@ bool TesseraeFrame::cacheIsUsable() {
 
 bool TesseraeFrame::download(const std::string& url) {
   const TesseraeClient::Result result =
-      TesseraeClient::downloadFrameToFile(url, TESSERAE_FRAME_CACHE_PATH, TESSERAE_FRAME_BYTES);
+      TesseraeClient::downloadFrameToFile(url, TESSERAE_FRAME_CACHE_PATH, tesseraeFrameBytes());
   if (result != TesseraeClient::Result::Ok) {
     LOG_ERR("TSR", "Frame download failed: %s", TesseraeClient::resultToString(result));
     return false;
@@ -168,7 +179,8 @@ bool TesseraeFrame::download(const std::string& url) {
 
 bool TesseraeFrame::paint(GfxRenderer& renderer, const bool turnOffScreen) {
   if (!panelIsSupported(renderer)) {
-    LOG_ERR("TSR", "Framebuffer is %zu bytes, expected %zu", renderer.getBufferSize(), TESSERAE_FRAME_BYTES_MONO);
+    LOG_ERR("TSR", "Panel %ux%u cannot take a Tesserae frame", renderer.getDisplayWidth(),
+            renderer.getDisplayHeight());
     return false;
   }
 

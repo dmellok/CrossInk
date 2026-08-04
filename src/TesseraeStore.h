@@ -14,24 +14,25 @@ constexpr uint32_t TESSERAE_POLL_MIN_S = 30;
 constexpr uint32_t TESSERAE_POLL_MAX_S = 604800;  // 7 days
 constexpr uint32_t TESSERAE_POLL_DEFAULT_S = 900;
 
-// Exact size of a native 1-bpp mono frame for the X4's 800x480 panel. The
-// Tesserae esp32_bw_bin renderer emits width*height/8 bytes, MSB-first,
-// bit-set = white, which is byte-identical to the CrossInk framebuffer.
-constexpr size_t TESSERAE_FRAME_BYTES_MONO = 48000;
-
-// 4-level grayscale frame from the esp32_gray2_bin renderer: width*height/4
-// bytes, 4 px/byte, MSB-first, 0b00 = black .. 0b11 = white. Same packing
-// GfxRenderer's own 2-bpp bitmap reader uses, so gray levels map straight onto
-// its GRAYSCALE_LSB / GRAYSCALE_MSB planes.
-constexpr size_t TESSERAE_FRAME_BYTES_GRAY = 96000;
-
 #ifdef CROSSINK_TESSERAE_GRAYSCALE
 constexpr bool TESSERAE_GRAYSCALE = true;
-constexpr size_t TESSERAE_FRAME_BYTES = TESSERAE_FRAME_BYTES_GRAY;
 #else
 constexpr bool TESSERAE_GRAYSCALE = false;
-constexpr size_t TESSERAE_FRAME_BYTES = TESSERAE_FRAME_BYTES_MONO;
 #endif
+
+// Frame sizes are derived from the live panel, not baked in: the X3 and X4 ship
+// in one binary and are told apart at runtime, and they pack different numbers
+// of bytes (800x480 -> 48000, 792x528 -> 52272). A compile-time size sent the
+// X3 the X4's frame and it was rejected before painting.
+//
+// Mono (esp32_bw_bin) is width*height/8, MSB-first, bit-set = white, which is
+// exactly the CrossInk framebuffer, so the mono frame is always one framebuffer
+// in size. 4-level grayscale (esp32_gray2_bin) is width*height/4: twice that,
+// 4 px/byte, 0b00 black .. 0b11 white, matching GfxRenderer's own 2-bpp bitmap
+// reader so the levels map straight onto its GRAYSCALE_LSB / GRAYSCALE_MSB
+// planes.
+size_t tesseraeMonoFrameBytes();
+size_t tesseraeFrameBytes();
 
 // Last painted frame, kept so a 304 can repaint without re-downloading.
 // Unlike a wake-cycle client, this sleep screen cannot simply skip the paint on

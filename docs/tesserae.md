@@ -19,8 +19,8 @@ The server does all the rendering. Tesserae composes the dashboard, dithers it, 
 
 | Mode | Renderer | Frame | Paint |
 |---|---|---|---|
-| Mono | `esp32_bw_bin` | 48,000 B (1 bpp) | copy into the framebuffer, one FULL refresh |
-| Grayscale | `esp32_gray2_bin` | 96,000 B (2 bpp, 4 levels) | base frame plus LSB/MSB planes, three passes |
+| Mono | `esp32_bw_bin` | width × height / 8 | copy into the framebuffer, one FULL refresh |
+| Grayscale | `esp32_gray2_bin` | width × height / 4 (4 levels) | base frame plus LSB/MSB planes, three passes |
 
 Grayscale is the default (`-DCROSSINK_TESSERAE_GRAYSCALE`). It looks considerably better on anything with photos or shading, at the cost of double the download and three panel passes per paint. Drop the flag for the mono path.
 
@@ -68,18 +68,21 @@ The frame length is validated against the exact expected byte count before anyth
 
 ## Hardware support
 
-| Device | Status |
-|---|---|
-| Xteink X4 | Working. Confirmed on hardware, mono and 4-level grayscale. |
-| Xteink X4 Pro | Untested. Same panel and controller, should work; no hardware to verify. |
-| Xteink X3 | **Not supported.** 792×528 panel; the client currently assumes the X4's frame size and falls back before touching the radio. |
+| Device | Panel | Mono frame | Grayscale frame | Status |
+|---|---|---|---|---|
+| Xteink X4 | 800×480 | 48,000 B | 96,000 B | Working. Confirmed on hardware, both modes. |
+| Xteink X3 | 792×528 | 52,272 B | 104,544 B | Implemented, **untested**. See below. |
+| Xteink X4 Pro | 800×480 | 48,000 B | 96,000 B | Untested. Same panel and controller as the X4, so it should work. |
 
-Server-side SKUs live in the Tesserae hardware catalog as `xteink_x4`, `xteink_x4_gray`, `xteink_x4_pro` and `xteink_x3`.
+Frame sizes are read from the live panel rather than baked in, and the announced kind is resolved at runtime from the X3/X4 probe `HalGPIO::begin()` already does. One binary drives both, so nothing needs selecting at build time.
+
+Server-side SKUs are `xteink_x4`, `xteink_x4_gray`, `xteink_x3`, `xteink_x3_gray` and `xteink_x4_pro`.
+
+**On the X3 specifically:** nobody has tested this. Two things are inherited assumptions rather than measurements. `portrait_flipped` is carried over from the X4, but the X3 uses a different controller family (UC8253 / UC8279d rather than SSD1677) and its framebuffer scan origin may not match; if a dashboard renders upside-down, switch the SKU to `portrait`. And `esp32_gray2_bin` is documented as targeting UC8179-class panels in their 4-gray mode, so grayscale on an X3 is the less certain of the two. Mono is the safer starting point.
 
 ## Not built yet
 
 - The 6-digit pairing-code path. Only zero-touch discover and MAC auto-claim are implemented.
-- Per-device frame sizing, which is what the X3 needs.
 - Touch. Tesserae's protocol supports it (the client sends a raw stroke; the server classifies the gesture and hit-tests it), but the X4 has no digitiser. Plausible on the X4 Pro.
 - `next_poll_s` is clamped to 30 s–7 days and stored, but nothing schedules on it; the refresh cadence is the user's sleep habit.
 - `sleep_until` / `next_sleep_s` are deliberately not published. They drive the server's smart-sync JIT render, which needs a predictable wake time, and this device wakes when a human picks it up.

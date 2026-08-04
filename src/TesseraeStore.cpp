@@ -2,6 +2,7 @@
 
 #ifdef CROSSINK_TESSERAE
 
+#include <HalDisplay.h>
 #include <HalStorage.h>
 #include <Logging.h>
 #include <ObfuscationUtils.h>
@@ -19,6 +20,10 @@ std::string normalizeServerUrl(const std::string& url) {
   return normalized;
 }
 }  // namespace
+
+size_t tesseraeMonoFrameBytes() { return display.getBufferSize(); }
+
+size_t tesseraeFrameBytes() { return TESSERAE_GRAYSCALE ? tesseraeMonoFrameBytes() * 2 : tesseraeMonoFrameBytes(); }
 
 uint32_t TesseraeStore::clampPollIntervalS(const uint32_t seconds) {
   if (seconds < TESSERAE_POLL_MIN_S) return TESSERAE_POLL_MIN_S;

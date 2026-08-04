@@ -13,7 +13,7 @@
  * needs: zero-touch discover (path A / MAC auto-claim path C), then
  * GET /frame for metadata and an unauthenticated GET of the returned artefact
  * URL. Frames are the native 1-bpp mono .bin produced by the esp32_bw_bin
- * renderer: exactly TESSERAE_FRAME_BYTES bytes, MSB-first, bit-set = white,
+ * renderer: exactly one framebuffer's worth of bytes, MSB-first, bit-set = white,
  * which matches the CrossInk framebuffer byte for byte.
  *
  * Every call is blocking and expects an already-connected station interface.
@@ -30,7 +30,7 @@ class TesseraeClient {
     AuthError,      // 401 / 403 — token rejected
     NoFrame,        // 204: nothing rendered for this device yet
     NotModified,    // 304: cached render_id still current
-    BadFrameSize,   // artefact length != TESSERAE_FRAME_BYTES
+    BadFrameSize,   // artefact length != the panel's expected frame size
   };
 
   static const char* resultToString(Result result);

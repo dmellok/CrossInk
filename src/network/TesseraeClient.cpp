@@ -117,6 +117,8 @@ TesseraeClient::Result TesseraeClient::downloadFrame(const std::string& url, uin
 #else  // !SIMULATOR
 
 #include <ArduinoJson.h>
+#include <HalDisplay.h>
+#include <HalGPIO.h>
 #include <HalPowerManager.h>
 #include <HalStorage.h>
 #include <Logging.h>
@@ -130,23 +132,26 @@ TesseraeClient::Result TesseraeClient::downloadFrame(const std::string& url, uin
 
 namespace {
 
-// Server-side kind this device announces itself as. Both variants compose at
-// 480x800 portrait and pack at the 800x480 firmware-native stride, so the
-// dashboard is laid out the way the reader is actually held; they differ only
-// in the renderer the SKU selects. Override at build time for a panel this
-// firmware also runs on but the catalog describes separately
-// (e.g. -DCROSSINK_TESSERAE_KIND='"xteink_x4_pro"').
-#ifndef CROSSINK_TESSERAE_KIND
-#ifdef CROSSINK_TESSERAE_GRAYSCALE
-#define CROSSINK_TESSERAE_KIND "xteink_x4_gray"
+// Server-side kind this device announces itself as. Resolved at runtime: the
+// X3 and X4 ship in one binary and are told apart by HalGPIO's boot probe, and
+// they need different SKUs because their panels pack different frame sizes
+// (800x480 -> 48000 bytes, 792x528 -> 52272). Every variant composes portrait
+// and packs at its own landscape native stride; the _gray suffix selects the
+// 2-bpp renderer.
+//
+// Override at build time for a panel this firmware also runs on but the catalog
+// describes separately, e.g. -DCROSSINK_TESSERAE_KIND='"xteink_x4_pro"'.
+const char* tesseraeKind() {
+#ifdef CROSSINK_TESSERAE_KIND
+  return CROSSINK_TESSERAE_KIND;
 #else
-#define CROSSINK_TESSERAE_KIND "xteink_x4"
+  if (gpio.deviceIsX3()) {
+    return TESSERAE_GRAYSCALE ? "xteink_x3_gray" : "xteink_x3";
+  }
+  return TESSERAE_GRAYSCALE ? "xteink_x4_gray" : "xteink_x4";
 #endif
-#endif
+}
 
-constexpr char TESSERAE_KIND[] = CROSSINK_TESSERAE_KIND;
-constexpr uint16_t NATIVE_PANEL_W = 800;
-constexpr uint16_t NATIVE_PANEL_H = 480;
 constexpr int REQUEST_TIMEOUT_MS = 15000;
 
 // Header buffers only; response bodies stream through esp_http_client_read().
@@ -280,14 +285,15 @@ TesseraeClient::Result TesseraeClient::discover() {
 
   JsonDocument request;
   request["device_id"] = deviceId;
-  request["kind"] = TESSERAE_KIND;
-  // Native stride, not the 480x800 composition size the manifest declares. The
-  // registered kind's panel block wins server-side, but if this ever lands on a
-  // generic auto-provisioning path instead, the renderer falls back to packing
-  // at whatever dims it was told. Native keeps that fallback producing a
-  // correctly-strided buffer rather than a garbled 480-wide one.
-  request["panel_w"] = NATIVE_PANEL_W;
-  request["panel_h"] = NATIVE_PANEL_H;
+  request["kind"] = tesseraeKind();
+  // Live panel dimensions, native stride rather than the portrait composition
+  // size the manifest declares. The registered kind's panel block wins
+  // server-side, but if this ever lands on a generic auto-provisioning path
+  // instead, the renderer falls back to packing at whatever dims it was told,
+  // and native keeps that fallback correctly strided. Read from the display so
+  // an X3 announces 792x528 rather than the X4's 800x480.
+  request["panel_w"] = display.getDisplayWidth();
+  request["panel_h"] = display.getDisplayHeight();
   request["gamut"] = "mono";
   request["fw_version"] = CROSSINK_VERSION;
   request["mac"] = deviceMac();
