@@ -1,14 +1,97 @@
-> ### ⚠️ `tesserae-client` branch
->
-> **This branch adds a [Tesserae](https://github.com/dmellok/tesserae) dashboard client to CrossInk.** It is a fork of [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk), branched from `main`, and is **not** intended to be merged upstream: CrossInk's [`SCOPE.md`](./SCOPE.md) lists *Active Connectivity* as out of scope, which is a reasonable call for a reading device. It is kept as a thin patch series on top of `main` instead.
->
-> Pick **Tesserae** under *Display → Sleep Screen* and the reader fetches a server-rendered dashboard on sleep entry and paints it as the sleep image. The radio comes up only on an explicit sleep transition, never on a timer, so the refresh rate is bounded by how often you actually put the reader down. Every failure path falls through to your normal sleep screen.
->
-> Everything is behind `-DCROSSINK_TESSERAE`, so it compiles out entirely (~17 KB of flash when enabled).
->
-> **Status:** working on the Xteink X4. See [Tesserae dashboard client](./docs/tesserae.md) for setup, current limitations and what is still unbuilt.
->
-> For everything else, the upstream README follows.
+# CrossInk + Tesserae
+
+Paint a server-rendered [Tesserae](https://github.com/dmellok/tesserae) dashboard as your Xteink e-reader's sleep screen.
+
+<!-- SCREENSHOT: docs/images/tesserae/dashboard.jpg -->
+
+A fork of [uxjulia/CrossInk](https://github.com/uxjulia/CrossInk) that adds a Tesserae client. Everything sits behind `-DCROSSINK_TESSERAE`, so it compiles out completely and the reader is unchanged without it.
+
+## Why it works this way
+
+Most e-paper dashboards are wake-cycle devices: deep sleep, wake on a timer, fetch, paint, sleep. That is fine for a dedicated panel with its own battery. This is a reader, and the cell is shared with actual reading, so a polling loop would wreck it.
+
+Instead the dashboard hangs off the sleep screen. **The radio comes up only on an explicit sleep transition, never on a timer.** You press power or it times out, it fetches a frame, paints it, and drops the radio. The refresh rate is exactly how often you put the reader down.
+
+The upside beyond battery: it inherits the firmware's existing panel-controller detection and ghosting handling instead of reimplementing them. The trade-off: the dashboard is only as current as the last time you closed the reader.
+
+**Every failure falls back.** No WiFi, server down, unapproved pairing, wrong frame size, torn cache: you get whichever sleep screen you picked. A dashboard problem never leaves a blank or half-drawn panel.
+
+## Supported hardware
+
+| Device | Panel | Status |
+|---|---|---|
+| Xteink X4 | 800×480 | Working, confirmed on hardware in mono and 4-level grayscale |
+| Xteink X3 | 792×528 | Implemented, untested. Start in mono |
+| Xteink X4 Pro | 800×480 | Untested. Same panel and controller as the X4 |
+
+One binary drives X3 and X4; the panel is detected at boot and the reader registers itself as the matching Tesserae device automatically.
+
+## Quick start
+
+You need a Tesserae server on your network and a WiFi network already saved on the reader.
+
+### 1. Build and flash
+
+```sh
+git clone --recursive -b tesserae-client https://github.com/dmellok/CrossInk
+cd CrossInk
+pio run -e tiny -t upload
+```
+
+`-e tiny` is the shippable X3/X4 build. Use `-e default` for a compile check.
+
+Grayscale is on by default. For the mono path, which is half the download and a single panel pass, drop `-DCROSSINK_TESSERAE_GRAYSCALE` from `platformio.ini`.
+
+### 2. Pair with Tesserae
+
+1. Save a WiFi network under **Settings → System → WiFi Networks**. The sleep path only uses stored credentials, so this has to happen first
+2. **Settings → System → Tesserae Dashboard** → set **Server URL**, e.g. `http://192.168.1.50:8765`
+3. Turn **Use as sleep screen** on
+4. Press **Test now**. Expect *"Approve in Tesserae"* the first time
+5. In Tesserae: **Settings → Devices**, find the reader in the Discovered strip, click **Register**
+6. **Test now** again. It fetches a real frame and previews it full-screen; any button dismisses it
+
+Pairing is zero-touch and covers MAC auto-claim, so reflashing silently re-acquires the same pairing.
+
+### 3. Turn it on
+
+**Settings → Display → Sleep Screen → Tesserae**.
+
+## Settings
+
+**Settings → System → Tesserae Dashboard**
+
+| Setting | What it does |
+|---|---|
+| Server URL | Tesserae base URL. Changing it drops the pairing, since the token belongs to the server that issued it |
+| Use as sleep screen | Master enable |
+| Always fetch fresh | Ask the server to re-render on every sleep rather than sending a conditional request. Off by default: it costs a full download each time instead of a 304 |
+| Fallback screen | What to paint when the dashboard can't be fetched |
+| Status | Not Set / Not paired / Approve in Tesserae / Paired |
+| Test now | Fetch and preview a real frame without waiting for a sleep |
+| Forget pairing | Only shown when paired |
+
+There is also a **Refresh Dashboard** action for the power-button shortcuts under **Settings → Controls**. It discards the cached frame and sleeps, so the next fetch asks the server for a fresh render. Map it to the short press, whose default is `Ignore`, rather than the long press, which defaults to `Sleep`.
+
+## How the frame gets there
+
+The server does all the rendering. Tesserae composes the dashboard, dithers it, and packs it into the panel's native buffer. The firmware decodes nothing, because the packing is already exactly how `GfxRenderer` reads bitmaps: mono is a copy into the framebuffer, grayscale is a base frame plus two bit-planes.
+
+Frames are cached on the SD card, so an unchanged dashboard repaints without re-downloading.
+
+Full detail, including the wire formats and the refresh semantics, is in **[docs/tesserae.md](./docs/tesserae.md)**.
+
+## Known limitations
+
+- **The dashboard is as fresh as the last time you closed the reader.** No timer wake. On this hardware that is not just a design choice: the battery latch cuts power to the MCU during sleep, RTC included, so there is nothing left running to fire a timer
+- No touch. Tesserae's protocol supports it, the X4 has no digitiser
+- Only zero-touch pairing is built; the 6-digit pairing-code path is not
+- Battery impact over weeks of real use is unmeasured
+- X3 support is written but has never run on an X3
+
+## Not going upstream
+
+CrossInk's [`SCOPE.md`](./SCOPE.md) lists *Active Connectivity* as out of scope, which is a fair call for a reading device. This is kept as a thin patch series on top of `main` rather than proposed for merge. Upstream owns the display abstraction and sleep-screen plumbing this is built on; all this branch does is hang a network fetch off the end of them.
 
 ---
 
