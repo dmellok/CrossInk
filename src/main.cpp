@@ -501,6 +501,12 @@ bool handleGlobalPowerButtonAction(const CrossPointSettings::SHORT_PWRBTN action
       LOG_DBG("MAIN", "Tesserae refresh requested; sleeping with a forced fetch");
       enterDeepSleep();
       return true;
+    case CrossPointSettings::SHORT_PWRBTN::TESSERAE_VIEW:
+      if (activityManager.canSnapshotForSleepOverlay()) {
+        return false;
+      }
+      activityManager.goToTesseraeViewer();
+      return true;
 #endif
     case CrossPointSettings::SHORT_PWRBTN::SYNC_PROGRESS:
       if (activityManager.canSnapshotForSleepOverlay()) {

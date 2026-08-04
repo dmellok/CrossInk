@@ -95,6 +95,9 @@ class ActivityManager {
   void goToJoinNetworkFileTransfer(std::string returnBookPath = {});
   void goToHotspotFileTransfer(std::string returnBookPath = {});
   void goToNearbyStatsSync();
+#ifdef CROSSINK_TESSERAE
+  void goToTesseraeViewer();
+#endif
   void goToSettings();
   void goToFileBrowser(std::string path = {});
   void goToRecentBooks();

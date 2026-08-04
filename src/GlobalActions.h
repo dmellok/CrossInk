@@ -14,6 +14,7 @@ inline bool isPowerButtonActionAvailableOutsideReader(const CrossPointSettings::
     case CrossPointSettings::SHORT_PWRBTN::CREATE_HOTSPOT:
 #ifdef CROSSINK_TESSERAE
     case CrossPointSettings::SHORT_PWRBTN::TESSERAE_REFRESH:
+    case CrossPointSettings::SHORT_PWRBTN::TESSERAE_VIEW:
 #endif
       return true;
     case CrossPointSettings::SHORT_PWRBTN::IGNORE:
@@ -32,6 +33,7 @@ inline bool isPowerButtonActionAvailableOutsideReader(const CrossPointSettings::
     case CrossPointSettings::SHORT_PWRBTN::CREATE_CLIPPING:
 #ifndef CROSSINK_TESSERAE
     case CrossPointSettings::SHORT_PWRBTN::TESSERAE_REFRESH:
+    case CrossPointSettings::SHORT_PWRBTN::TESSERAE_VIEW:
 #endif
     case CrossPointSettings::SHORT_PWRBTN::SHORT_PWRBTN_COUNT:
     default:

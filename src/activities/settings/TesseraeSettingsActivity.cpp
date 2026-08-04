@@ -13,21 +13,23 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "activities/network/TesseraeViewerActivity.h"
 #include "network/TesseraeClient.h"
 #include "network/WifiAutoConnect.h"
 
 namespace {
 // Server URL, enable toggle, fallback screen, status, test now.
 // A paired device also gets "Forget pairing" (BASE_ITEMS + 1).
-constexpr int BASE_ITEMS = 6;
+constexpr int BASE_ITEMS = 7;
 
 constexpr int ITEM_URL = 0;
 constexpr int ITEM_ENABLED = 1;
 constexpr int ITEM_ALWAYS_FRESH = 2;
 constexpr int ITEM_FALLBACK = 3;
 constexpr int ITEM_STATUS = 4;
-constexpr int ITEM_TEST = 5;
-constexpr int ITEM_UNPAIR = 6;
+constexpr int ITEM_VIEW = 5;
+constexpr int ITEM_TEST = 6;
+constexpr int ITEM_UNPAIR = 7;
 
 // Sleep screens offered as the fallback. QUICK_RESUME and TESSERAE_SLEEP are
 // excluded: the first is a different sleep path entirely, the second would
@@ -256,6 +258,10 @@ void TesseraeSettingsActivity::handleSelection() {
     }
     case ITEM_STATUS:
       break;  // read-only
+    case ITEM_VIEW:
+      startActivityForResult(std::make_unique<TesseraeViewerActivity>(renderer, mappedInput),
+                             [this](const ActivityResult&) { requestUpdate(); });
+      break;
     case ITEM_TEST:
       testPending = true;
       testMessage = tr(STR_TESSERAE_TESTING);
@@ -305,7 +311,8 @@ void TesseraeSettingsActivity::render(RenderLock&&) {
 
   static const StrId fieldNames[] = {StrId::STR_TESSERAE_SERVER_URL,   StrId::STR_TESSERAE_ENABLE,
                                      StrId::STR_TESSERAE_ALWAYS_FRESH, StrId::STR_TESSERAE_FALLBACK,
-                                     StrId::STR_TESSERAE_STATUS,       StrId::STR_TESSERAE_TEST_NOW};
+                                     StrId::STR_TESSERAE_STATUS,       StrId::STR_TESSERAE_VIEW,
+                                     StrId::STR_TESSERAE_TEST_NOW};
 
   GUI.drawList(
       renderer, Rect{0, contentTop, pageWidth, contentHeight}, menuItems, static_cast<int>(selectedIndex),

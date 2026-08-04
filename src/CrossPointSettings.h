@@ -229,6 +229,7 @@ class CrossPointSettings {
     // Declared unconditionally so the persisted shortcut value means the same
     // thing whether or not CROSSINK_TESSERAE is compiled in.
     TESSERAE_REFRESH = 22,
+    TESSERAE_VIEW = 23,
     SHORT_PWRBTN_COUNT
   };
 

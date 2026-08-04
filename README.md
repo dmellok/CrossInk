@@ -86,7 +86,9 @@ Pairing is zero-touch and covers MAC auto-claim, so reflashing silently re-acqui
 | Test now | Fetch and preview a real frame without waiting for a sleep |
 | Forget pairing | Only shown when paired |
 
-There is also a **Refresh Dashboard** action for the power-button shortcuts under **Settings → Controls**. It discards the cached frame and sleeps, so the next fetch asks the server for a fresh render. Map it to the short press, whose default is `Ignore`, rather than the long press, which defaults to `Sleep`.
+**View dashboard** opens it full-screen while the reader is awake instead of waiting for a sleep. The cached frame paints instantly with no radio, Select refreshes, Back exits.
+
+Two power-button shortcuts live under **Settings → Controls**: *View dashboard* and *Refresh Dashboard* (which discards the cache and sleeps, so the next fetch is a fresh render). Map either to the short press, whose default is `Ignore`, rather than the long press, which defaults to `Sleep`.
 
 ## How the frame gets there
 

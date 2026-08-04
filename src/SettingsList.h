@@ -413,6 +413,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                            StrId::STR_SAVE_CLIPPING,
 #ifdef CROSSINK_TESSERAE
                            StrId::STR_TESSERAE_REFRESH,
+                           StrId::STR_TESSERAE_VIEW,
 #endif
                           },
                           "shortPwrBtn", StrId::STR_CAT_CONTROLS)
@@ -439,6 +440,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                 CrossPointSettings::CREATE_CLIPPING,
 #ifdef CROSSINK_TESSERAE
                                 CrossPointSettings::TESSERAE_REFRESH,
+                                CrossPointSettings::TESSERAE_VIEW,
 #endif
                                }));
     add(SettingInfo::Enum(StrId::STR_LONG_PRESS_ACTION, &CrossPointSettings::longPwrBtn,
@@ -465,6 +467,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                            StrId::STR_SAVE_CLIPPING,
 #ifdef CROSSINK_TESSERAE
                            StrId::STR_TESSERAE_REFRESH,
+                           StrId::STR_TESSERAE_VIEW,
 #endif
                           },
                           "longPwrBtn", StrId::STR_CAT_CONTROLS)
@@ -491,6 +494,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                                 CrossPointSettings::CREATE_CLIPPING,
 #ifdef CROSSINK_TESSERAE
                                 CrossPointSettings::TESSERAE_REFRESH,
+                                CrossPointSettings::TESSERAE_VIEW,
 #endif
                                }));
     add(SettingInfo::Enum(StrId::STR_LONG_PRESS_MENU_ACTION, &CrossPointSettings::longPressMenuAction,
