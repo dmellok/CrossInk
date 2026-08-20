@@ -4,6 +4,17 @@
 
 - Hidden folders can be created using the web file manager now when prefixed with a dot.
 - Choose whole numbers, one decimal, or two decimals for the book progress percentage in status bar settings.
+- Dictionary lookups can now save the selected word or phrase directly as a clipping.
+- Readers can configure an Up + Down side-button shortcut; on touchscreen devices, while the reader touchscreen is disabled, the same chord always opens Settings so it can be restored.
+- Tesserae dashboard sleep screen. Pick `Tesserae` under Display > Sleep Screen and the reader fetches a server-rendered dashboard on sleep entry and paints it as the sleep image. WiFi comes up only on an explicit sleep transition, never on a timer, so the refresh rate is bounded by how often you actually put the reader down.
+- 4-level grayscale dashboards, so photos and shading render properly instead of being flattened to black and white.
+- Tesserae Dashboard settings screen (Settings > System) with server URL, an enable toggle, `Always fetch fresh`, a fallback sleep screen, pairing status, and a `Test now` action that fetches and previews a real frame on the panel.
+- `View dashboard`, which opens the dashboard full-screen while the reader is awake. The cached frame appears instantly without using WiFi; Select re-renders it, and Up/Down page through a rotation if one is bound to the reader in Tesserae. Available from the Tesserae settings screen and as a button shortcut.
+- `Refresh style` setting for the dashboard viewer: `Verbose` narrates each step while it connects, fetches and paints, `Simple` shows a single message, and `Keep current` leaves the dashboard on screen until the new one is ready.
+- `Refresh Dashboard` button shortcut, which discards the cached frame so the next sleep asks the server for a freshly rendered one.
+- Dashboards are cached on the SD card, so an unchanged dashboard repaints without re-downloading it.
+- Pairing is zero-touch: the reader announces itself and you approve it once in Tesserae. A reflashed device silently re-acquires its existing pairing by MAC.
+- Battery, signal and IP are reported back to Tesserae after each dashboard paint, so the reader shows as online there.
 
 ### Changed
 
@@ -20,6 +31,36 @@
 - End-of-book selection remains consistent during concurrent redraws.
 - Image dithering reports low-memory failures instead of aborting during buffer allocation.
 - The debugging monitor plots CrossInk heap and PSRAM logs separately; ZIP failures identify the affected EPUB entry.
+- Crash reports now include the faulting instruction and CPU exception details needed to diagnose crashes on X3/X4 and X4 Pro/Sticky readers.
+- EPUB text layout now exits safely instead of restarting when an X3/X4 runs out of contiguous memory while arranging right-to-left text.
+- Holding page-turn buttons while browsing saved clippings no longer crashes.
+- File Browser navigation no longer risks corrupted rows while the list is redrawing, and wrapped two-line filenames remain reachable when paging.
+- The web EPUB optimizer now removes oversized XHTML comments that can otherwise stop low-memory chapter indexing.
+- Mixed reader fonts, including SD-card fallback glyphs, are warmed together to avoid repeated slow redraws.
+- Ruby annotations now stay together instead of splitting across lines.
+- Transparent BMP sleep overlays no longer develop white holes over the preserved reader page.
+- OPDS search now accepts the first Confirm press after closing the keyboard.
+- Treat empty KOReader sync responses as no remote reading position.
+- The image viewer no longer leaves a white box behind the hidden Previous/Next hint at the first or last image in a folder.
+- Holding a side button for a chapter skip now skips immediately instead of waiting for release.
+- XTC book covers now appear consistently across all Home screen layouts.
+- Choosing Sleep from Quick Actions now reliably shows the selected cover or sleep screen.
+- TXT readers now font size changes should work more reliably on touch devices and via shortcuts.
+- Sleep-image, dictionary, and SD-font folders now work regardless of capitalization, including `/Sleep`, `/Dictionaries`, and `/Fonts`.
+- X4 Pro's Home button shortcut for page turns now work in XTC and XTCH readers.
+- The Previous Chapter two-finger swipe now opens the previous chapter at its first page.
+- Power-button shortcuts now continue to work while the reader touchscreen is disabled.
+- OPDS book lists now use the standard Back header without obscuring its divider, while keeping Search available.
+- Opening Select Chapter no longer restarts X3/X4 readers for EPUBs with thousands of chapters.
+- X4 now clears the retained sleep screen with one half refresh on wake when Sunlight Fading Fix is enabled, reducing ghosting before the next screen appears.
+- Saved EPUB clipping highlights no longer wash out their text when reader text anti-aliasing is enabled.
+- Saved EPUB clipping highlights now continue through ellipses, including non-breaking-space separators.
+- EPUB clipping previews now retain complete multi-paragraph selections.
+- Dismissing a dictionary definition with Back or an outside tap now returns directly to the reader instead of reopening word selection.
+- The web Settings page now loads reliably when KOReader Sync has an older saved password.
+- Nearby Stats Sync now shows Sync and Cancel buttons on touch readers.
+- The image viewer now offers the "Set Cover" option for PNG files.
+- Xteink X3 readers now receive a dashboard packed for their own 792x528 panel instead of the X4's, which was rejected before painting. Frame sizes and the panel reported at pairing are read from the live display, and the reader registers itself as the matching Tesserae device automatically. Confirmed working on an X3 in 4-level grayscale.
 
 - Exiting Calibre Wireless on X4 now returns Home with one clean screen refresh instead of repeated blank flashes.
 - Manage Fonts no longer crashes after Wi-Fi connects on ESP32-S3 readers.

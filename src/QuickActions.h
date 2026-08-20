@@ -57,7 +57,12 @@ inline constexpr std::array<StrId, CrossPointSettings::QUICK_ACTION_SLOT_ACTION_
 
 // Shared display order for shortcut pickers. The values remain the persisted
 // SHORT_PWRBTN IDs; only their presentation order is centralized here.
-inline constexpr std::array<CrossPointSettings::SHORT_PWRBTN, 30> shortcutActionOrder = {
+#ifdef CROSSINK_TESSERAE
+inline constexpr size_t SHORTCUT_ACTION_ORDER_COUNT = 32;
+#else
+inline constexpr size_t SHORTCUT_ACTION_ORDER_COUNT = 30;
+#endif
+inline constexpr std::array<CrossPointSettings::SHORT_PWRBTN, SHORTCUT_ACTION_ORDER_COUNT> shortcutActionOrder = {
     CrossPointSettings::IGNORE,
     CrossPointSettings::SLEEP,
     CrossPointSettings::PAGE_TURN,
@@ -88,6 +93,10 @@ inline constexpr std::array<CrossPointSettings::SHORT_PWRBTN, 30> shortcutAction
     CrossPointSettings::QUICK_LOCK,
     CrossPointSettings::TOGGLE_FRONTLIGHT,
     CrossPointSettings::TOGGLE_TOUCHSCREEN,
+#ifdef CROSSINK_TESSERAE
+    CrossPointSettings::TESSERAE_REFRESH,
+    CrossPointSettings::TESSERAE_VIEW,
+#endif
 };
 
 inline bool supportsTiltPageTurn() { return halTiltSensor.isAvailable(); }
@@ -97,6 +106,11 @@ inline bool isActionAvailable(const uint8_t action) {
   if (action == CrossPointSettings::QUICK_ACTIONS || action == CrossPointSettings::QUICK_LOCK) return true;
   if (action == CrossPointSettings::TOGGLE_FRONTLIGHT) return Frontlight.present();
   if (action == CrossPointSettings::TOGGLE_TOUCHSCREEN) return gpio.hasTouch();
+#ifdef CROSSINK_TESSERAE
+  // Offered on every panel: the dashboard is a server-side render, so nothing
+  // about it depends on the hardware the shortcut is being bound on.
+  if (action == CrossPointSettings::TESSERAE_REFRESH || action == CrossPointSettings::TESSERAE_VIEW) return true;
+#endif
   if (action < CrossPointSettings::QUICK_ACTION_SLOT_ACTION_COUNT) {
     return action != CrossPointSettings::TOGGLE_TILT_PAGE_TURN || supportsTiltPageTurn();
   }
@@ -120,6 +134,10 @@ inline StrId actionLabel(const uint8_t action) {
   if (action == CrossPointSettings::QUICK_LOCK) return StrId::STR_QUICK_LOCK;
   if (action == CrossPointSettings::PREVIOUS_PAGE) return StrId::STR_PREV_PAGE;
   if (action == CrossPointSettings::NEARBY_POSITION_SYNC) return StrId::STR_NEARBY_POSITION_SYNC;
+#ifdef CROSSINK_TESSERAE
+  if (action == CrossPointSettings::TESSERAE_REFRESH) return StrId::STR_TESSERAE_REFRESH;
+  if (action == CrossPointSettings::TESSERAE_VIEW) return StrId::STR_TESSERAE_VIEW;
+#endif
   return StrId::STR_HOME_BUTTON_LOCK;
 }
 

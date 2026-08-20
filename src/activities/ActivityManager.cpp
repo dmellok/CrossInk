@@ -34,6 +34,9 @@
 #include "reader/BookReadingStats.h"
 #include "reader/BookStatsActivity.h"
 #include "reader/GlobalReadingStats.h"
+#ifdef CROSSINK_TESSERAE
+#include "network/TesseraeViewerActivity.h"
+#endif
 #include "reader/ReaderActivity.h"
 #include "settings/OpdsServerListActivity.h"
 #include "settings/SettingsActivity.h"
@@ -656,6 +659,12 @@ bool ActivityManager::resumeFileTransferFromNetworkBoot(const uint32_t payload) 
 void ActivityManager::goToNearbyStatsSync() {
   replaceActivity(std::make_unique<NearbyStatsSyncActivity>(renderer, mappedInput));
 }
+
+#ifdef CROSSINK_TESSERAE
+void ActivityManager::goToTesseraeViewer() {
+  replaceActivity(std::make_unique<TesseraeViewerActivity>(renderer, mappedInput));
+}
+#endif
 
 void ActivityManager::goToSettings(const bool dismissOnUpSwipe) {
   preferredHomeBookPath.clear();

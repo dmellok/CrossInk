@@ -29,6 +29,9 @@
 #include "OpdsServerListActivity.h"
 #include "QuickActions.h"
 #include "QuickActionsActivity.h"
+#ifdef CROSSINK_TESSERAE
+#include "TesseraeSettingsActivity.h"
+#endif
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
@@ -1068,6 +1071,11 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::OPDSBrowser:
         startActivityForResult(std::make_unique<OpdsServerListActivity>(renderer, mappedInput), resultHandler);
         break;
+#ifdef CROSSINK_TESSERAE
+      case SettingAction::TesseraeDashboard:
+        startActivityForResult(std::make_unique<TesseraeSettingsActivity>(renderer, mappedInput), resultHandler);
+        break;
+#endif
       case SettingAction::Network:
         startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput, false),
                                [](const ActivityResult&) {

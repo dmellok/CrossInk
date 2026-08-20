@@ -36,6 +36,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     QUICK_RESUME = 9,
     MINIMAL_STATS_SLEEP = 10,
     DASHBOARD_SLEEP = 11,
+    // Declared unconditionally, even when CROSSINK_TESSERAE is compiled out,
+    // so the persisted sleep-screen value means the same thing in every build.
+    TESSERAE_SLEEP = 12,
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
@@ -265,6 +268,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     // raw values or they can silently change an existing binding's behavior.
     PREVIOUS_PAGE = 31,
     NEARBY_POSITION_SYNC = 32,
+    // Declared unconditionally so the persisted shortcut value means the same
+    // thing whether or not CROSSINK_TESSERAE is compiled in. Numbered clear of
+    // the X4 Pro Home-key block (23-26) and everything upstream appended since (through 32).
+    TESSERAE_REFRESH = 33,
+    TESSERAE_VIEW = 34,
     SHORT_PWRBTN_COUNT
   };
 
