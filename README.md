@@ -24,9 +24,12 @@ The upside beyond battery: it inherits the firmware's existing panel-controller 
 |---|---|---|
 | Xteink X4 | 800×480 | Working, confirmed on hardware in mono and 4-level grayscale |
 | Xteink X3 | 792×528 | Working, confirmed on hardware in 4-level grayscale |
+| Seeed Sticky | 800×480 | Firmware confirmed on hardware. Dashboard pending the catalog entry below |
 | Xteink X4 Pro | 800×480 | Untested. Same panel and controller as the X4 |
 
-One binary drives X3 and X4; the panel is detected at boot and the reader registers itself as the matching Tesserae device automatically.
+One binary drives X3 and X4; the panel is detected at boot and the reader registers itself as the matching Tesserae device automatically. The Sticky and X4 Pro are separate builds and announce their own kinds.
+
+The Sticky needs `seeed_sticky` / `seeed_sticky_gray` in the Tesserae catalog before it can pair ([dmellok/tesserae#245](https://github.com/dmellok/tesserae/pull/245)). Its panel is the same 800×480 SSD1677 as the X4, so the frame is byte-identical, but the orientation in that entry is inferred rather than observed and may need flipping.
 
 ## Quick start
 
@@ -35,12 +38,12 @@ You need a Tesserae server on your network and a WiFi network already saved on t
 ### 1. Build and flash
 
 ```sh
-git clone --recursive -b tesserae-client https://github.com/dmellok/CrossInk
+git clone --recursive -b tesserae-dev https://github.com/dmellok/CrossInk
 cd CrossInk
-pio run -e tiny -t upload
+pio run -e default -t upload
 ```
 
-`-e tiny` is the shippable X3/X4 build. Use `-e default` for a compile check.
+`-e default` is the X3/X4 build, `-e sticky` the Seeed Sticky, `-e x4-pro` the X4 Pro.
 
 Grayscale is on by default. For the mono path, which is half the download and a single panel pass, drop `-DCROSSINK_TESSERAE_GRAYSCALE` from `platformio.ini`.
 

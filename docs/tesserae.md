@@ -11,7 +11,7 @@ Paints a server-rendered [Tesserae](https://github.com/dmellok/tesserae) dashboa
   <img src="./images/tesserae/dashboard.png" alt="A Tesserae dashboard painted on an Xteink X4" width="300" />
 </p>
 
-This lives on the `tesserae-client` branch only and is not upstream. See the note at the top of the [README](../README.md) for why.
+This lives on the `tesserae-dev` branch only and is not upstream. See the note at the top of the [README](../README.md) for why.
 
 ## How it works
 
@@ -100,11 +100,14 @@ The frame length is validated against the exact expected byte count before anyth
 |---|---|---|---|---|
 | Xteink X4 | 800×480 | 48,000 B | 96,000 B | Working. Confirmed on hardware, both modes. |
 | Xteink X3 | 792×528 | 52,272 B | 104,544 B | Working. Confirmed on hardware in grayscale. |
+| Seeed Sticky | 800×480 | 48,000 B | 96,000 B | Firmware confirmed on hardware. Dashboard blocked on the catalog entry. |
 | Xteink X4 Pro | 800×480 | 48,000 B | 96,000 B | Untested. Same panel and controller as the X4, so it should work. |
 
-Frame sizes are read from the live panel rather than baked in, and the announced kind is resolved at runtime from the X3/X4 probe `HalGPIO::begin()` already does. One binary drives both, so nothing needs selecting at build time.
+Frame sizes are read from the live panel rather than baked in. The X3 and X4 share one binary and are told apart by the probe `HalGPIO::begin()` already does, so nothing needs selecting between them at build time. The Sticky and X4 Pro are separate ESP32-S3 builds (`-e sticky`, `-e x4-pro`) and resolve their kind from the board macro instead.
 
-Server-side SKUs are `xteink_x4`, `xteink_x4_gray`, `xteink_x3`, `xteink_x3_gray` and `xteink_x4_pro`.
+Server-side SKUs are `xteink_x4`, `xteink_x4_gray`, `xteink_x3`, `xteink_x3_gray`, `xteink_x4_pro`, `seeed_sticky` and `seeed_sticky_gray`.
+
+**On the Sticky specifically:** CrossInk itself runs on the hardware, but the dashboard cannot pair until `seeed_sticky` / `seeed_sticky_gray` land in the Tesserae catalog ([dmellok/tesserae#245](https://github.com/dmellok/tesserae/pull/245)). The panel is the same 800×480 SSD1677 as the X4 and de-link, driven through the same framebuffer path, so the packed frame is byte-identical and only the announced kind differs. The orientation in that catalog entry is inherited from `xteink_x4` rather than observed: CrossInk's Portrait transform is board-independent and both board profiles ship `NO_FLIP`, so the same 180° offset should apply. If a dashboard paints upside-down there, the entry needs `portrait` and the SDK board profile probably needs `ROTATE_180`. CrossInk's own Sticky profile also lists the SD-over-shared-SPI arbitration as inferred from the vendor demo.
 
 **On the X3 specifically:** confirmed working in grayscale on a UC8279d unit. Two things that were inherited guesses are now measured: `portrait_flipped` is correct despite the different controller family, and `esp32_gray2_bin` drives UC8253 / UC8279d silicon even though it is written for UC8179-class panels. The X3 needs the OEM preconditioning settle pass between the base frame and the planes, which the firmware issues unconditionally since it is a no-op on the X4.
 
