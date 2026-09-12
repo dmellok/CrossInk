@@ -16,6 +16,7 @@
 - Pairing is zero-touch: the reader announces itself and you approve it once in Tesserae. A reflashed device silently re-acquires its existing pairing by MAC.
 - Battery, signal and IP are reported back to Tesserae after each dashboard paint, so the reader shows as online there.
 - Seeed Sticky and Xteink X4 Pro builds now announce themselves to Tesserae under their own device kinds instead of registering as an Xteink X4. The Sticky needs `seeed_sticky` in the Tesserae catalog before it can pair.
+- The Tesserae client accepts an `https://` server URL, so the reader can sit behind a reverse proxy with a publicly trusted certificate. Redirects are still not followed, so enter the final `https://` address rather than an `http://` one that bounces.
 
 ### Changed
 

@@ -129,6 +129,7 @@ TesseraeClient::Result TesseraeClient::downloadFrame(const std::string& url, uin
 #include <algorithm>
 #include <cstring>
 
+#include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "network/WifiPowerSaveGuard.h"
 
@@ -205,6 +206,9 @@ bool performJsonRequest(const std::string& url, const std::string& requestBody, 
   config.timeout_ms = REQUEST_TIMEOUT_MS;
   config.buffer_size = HTTP_RX_BUFFER;
   config.buffer_size_tx = HTTP_TX_BUFFER;
+  // Trust the public CA bundle so an https:// server URL (a reverse proxy in
+  // front of Tesserae) connects; plain http:// is unaffected.
+  config.crt_bundle_attach = esp_crt_bundle_attach;
   config.method = requestBody.empty() ? HTTP_METHOD_GET : HTTP_METHOD_POST;
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -413,6 +417,9 @@ TesseraeClient::Result TesseraeClient::downloadFrameToFile(const std::string& ur
   config.timeout_ms = REQUEST_TIMEOUT_MS;
   config.buffer_size = HTTP_RX_BUFFER;
   config.buffer_size_tx = HTTP_TX_BUFFER;
+  // Trust the public CA bundle so an https:// server URL (a reverse proxy in
+  // front of Tesserae) connects; plain http:// is unaffected.
+  config.crt_bundle_attach = esp_crt_bundle_attach;
   config.method = HTTP_METHOD_GET;
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -556,6 +563,9 @@ TesseraeClient::Result TesseraeClient::downloadFrame(const std::string& url, uin
   config.timeout_ms = REQUEST_TIMEOUT_MS;
   config.buffer_size = HTTP_RX_BUFFER;
   config.buffer_size_tx = HTTP_TX_BUFFER;
+  // Trust the public CA bundle so an https:// server URL (a reverse proxy in
+  // front of Tesserae) connects; plain http:// is unaffected.
+  config.crt_bundle_attach = esp_crt_bundle_attach;
   config.method = HTTP_METHOD_GET;
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
