@@ -1,0 +1,157 @@
+# Tesserae fork release: builds one firmware .bin per device target from the
+# tesserae-dev branch and attaches them to a GitHub Release on this fork.
+#
+# This is separate from upstream's release.yml, which needs a RELEASE_PAT and
+# an SSH signing key to publish the OTA catalog to GitHub Pages. This workflow
+# only needs the default GITHUB_TOKEN. The [crossink] version in platformio.ini
+# is substituted at build time and never committed, so rebasing onto upstream
+# stays conflict-free.
+#
+# Run it from the Actions tab (workflow_dispatch) with a version such as
+# 1.6.0-tesserae.1, or push a tag matching v*-tesserae*.
+name: Tesserae Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 1.6.0-tesserae.1"
+        required: true
+        type: string
+      draft:
+        description: "Create the release as a draft"
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*-tesserae*"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Resolve release version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: default
+            firmware: firmware-x3-x4
+          - environment: sticky
+            firmware: firmware-sticky
+          - environment: x4-pro
+            firmware: firmware-x4-pro
+          - environment: x4-classic
+            firmware: firmware-x4-classic
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          # Do not cache PlatformIO's Python virtual environment. It is tied to
+          # the runner's Python and can become invalid when restored elsewhere.
+          path: |
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: ${{ runner.os }}-platformio-py3.14-core6.1.19-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
+
+      - name: Install PlatformIO Core
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Configure release version
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          sed -i "/^\[crossink\]$/,/^\[/s/^version = .*/version = $RELEASE_VERSION/" platformio.ini
+          grep -n '^version = ' platformio.ini
+
+      - name: Build CrossInk
+        env:
+          CROSSINK_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: pio run -j1 -e ${{ matrix.environment }}
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: tesserae-firmware-${{ matrix.environment }}
+          path: .pio/build/${{ matrix.environment }}/${{ matrix.firmware }}-v${{ needs.prepare.outputs.version }}.bin
+          if-no-files-found: error
+
+  publish:
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Download firmware artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: tesserae-firmware-*
+          merge-multiple: true
+          path: release-firmware
+
+      - name: Write checksums
+        run: |
+          cd release-firmware
+          sha256sum firmware-*.bin | tee SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ env.RELEASE_VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: v${{ env.RELEASE_VERSION }}
+          draft: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || false }}
+          prerelease: true
+          body: |
+            CrossInk with the Tesserae dashboard client, built from `tesserae-dev` at `${{ github.sha }}`.
+
+            | Device | File | Chip |
+            |---|---|---|
+            | Xteink X3 / X4 | `firmware-x3-x4-v${{ env.RELEASE_VERSION }}.bin` | ESP32-C3 |
+            | Xteink X4 Pro | `firmware-x4-pro-v${{ env.RELEASE_VERSION }}.bin` | ESP32-S3 |
+            | Xteink X4 Classic | `firmware-x4-classic-v${{ env.RELEASE_VERSION }}.bin` | ESP32-S3 |
+            | Seeed reTerminal Sticky | `firmware-sticky-v${{ env.RELEASE_VERSION }}.bin` | ESP32-S3 |
+
+            Flash over USB with esptool at offset `0x10000`, or copy the `.bin` to the SD card and use
+            `Settings > System > SD Card Firmware Update`. See [docs/installation.md](https://github.com/${{ github.repository }}/blob/tesserae-dev/docs/installation.md).
+          files: |
+            release-firmware/firmware-x3-x4-v${{ env.RELEASE_VERSION }}.bin
+            release-firmware/firmware-sticky-v${{ env.RELEASE_VERSION }}.bin
+            release-firmware/firmware-x4-pro-v${{ env.RELEASE_VERSION }}.bin
+            release-firmware/firmware-x4-classic-v${{ env.RELEASE_VERSION }}.bin
+            release-firmware/SHA256SUMS
