@@ -56,7 +56,7 @@ Pairing is zero-touch and covers MAC auto-claim, so a reflash silently re-acquir
 | Use as sleep screen | Master enable. |
 | Always fetch fresh | Force a server-side re-render on every sleep instead of a conditional request. Off by default: it costs a full download each time rather than a 304. |
 | Refresh style | What the viewer shows while it fetches. `Verbose` names each step, `Simple` shows one message, `Keep current` leaves the dashboard up until the new frame lands. |
-| Fallback screen | What to paint when the dashboard can't be fetched. |
+| Fallback screen | What to paint when the dashboard can't be fetched. `Last dashboard` repaints the cached frame so the panel keeps showing what it last fetched; the other choices are the reader's own sleep screens. |
 | Status | Not Set / Not paired / Approve in Tesserae / Paired. |
 | Test now | Fetch and preview a real frame without waiting for a sleep. |
 | Forget pairing | Shown only when paired. |
@@ -91,6 +91,8 @@ A normal sleep does not make the server re-render. `?button=refresh` (sent by *T
 ## Failure handling
 
 Every failure falls through to the fallback sleep screen: no WiFi, unreachable server, unapproved pairing, expired token, wrong frame length, torn cache. A dashboard failure never leaves a blank or half-drawn panel.
+
+With the fallback set to `Last dashboard` the client repaints the cached frame instead, so a reader that sleeps out of WiFi range keeps showing the dashboard it last fetched rather than swapping to a reader sleep screen. Only a missing or unreadable cache (a fresh install, a new pairing, or a cleared SD card) drops through to the built-in sleep screen.
 
 The frame length is validated against the exact expected byte count before anything is painted, and downloads land in a temporary file that is only renamed into place once the full length has arrived, so a dropped transfer cannot replace a good cached frame with a torn one.
 

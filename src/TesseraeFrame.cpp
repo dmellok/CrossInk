@@ -130,8 +130,7 @@ bool paintGrayscale(GfxRenderer& renderer, uint8_t* frameBuffer, const bool turn
   return true;
 }
 
-bool paintMono(GfxRenderer& renderer, uint8_t* frameBuffer, const size_t bufferSize,
-               const bool turnOffScreen) {
+bool paintMono(GfxRenderer& renderer, uint8_t* frameBuffer, const size_t bufferSize, const bool turnOffScreen) {
   HalFile file;
   if (!Storage.openFileForRead("TSR", TESSERAE_FRAME_CACHE_PATH, file)) return false;
   const size_t expected = tesseraeMonoFrameBytes();
@@ -164,8 +163,10 @@ bool TesseraeFrame::panelIsSupported(const GfxRenderer& renderer) {
 
 bool TesseraeFrame::cacheIsUsable() {
   if (TESSERAE_STORE.getLastRenderId().empty()) return false;
-  return Storage.exists(TESSERAE_FRAME_CACHE_PATH);
+  return cacheExists();
 }
+
+bool TesseraeFrame::cacheExists() { return Storage.exists(TESSERAE_FRAME_CACHE_PATH); }
 
 bool TesseraeFrame::download(const std::string& url) {
   const TesseraeClient::Result result =
@@ -179,8 +180,7 @@ bool TesseraeFrame::download(const std::string& url) {
 
 bool TesseraeFrame::paint(GfxRenderer& renderer, const bool turnOffScreen) {
   if (!panelIsSupported(renderer)) {
-    LOG_ERR("TSR", "Panel %ux%u cannot take a Tesserae frame", renderer.getDisplayWidth(),
-            renderer.getDisplayHeight());
+    LOG_ERR("TSR", "Panel %ux%u cannot take a Tesserae frame", renderer.getDisplayWidth(), renderer.getDisplayHeight());
     return false;
   }
 

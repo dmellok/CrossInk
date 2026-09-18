@@ -31,7 +31,10 @@ class SleepActivity final : public Activity {
   // Fetches a Tesserae dashboard frame on sleep entry. Every failure path
   // falls through to renderTesseraeFallbackSleepScreen().
   void renderTesseraeSleepScreen() const;
-  void renderTesseraeFallbackSleepScreen() const;
+  // cachedFrameUsable is false when the caller has just failed to paint the
+  // cached frame, so the Last dashboard fallback skips straight to the
+  // built-in screen instead of retrying the same bytes.
+  void renderTesseraeFallbackSleepScreen(bool cachedFrameUsable = true) const;
 #endif
   void renderLastScreenSleepScreen() const;
   void renderBlankSleepScreen() const;

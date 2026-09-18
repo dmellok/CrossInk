@@ -23,6 +23,11 @@ namespace TesseraeFrame {
 // If-None-Match, so a 304 can never arrive.
 bool cacheIsUsable();
 
+// True when a cached frame file exists at all, whether or not its render_id is
+// still known. The Refresh Dashboard shortcut drops the render_id but leaves
+// the bytes, and they are still the last dashboard the user saw.
+bool cacheExists();
+
 // Fetch the artefact into the cache. Validates the length against the wire
 // size for the configured gamut and leaves any previous cache intact on
 // failure. Returns false on any network, size or storage error.

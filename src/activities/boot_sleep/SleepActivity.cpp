@@ -962,7 +962,7 @@ void SleepActivity::renderTesseraeSleepScreen() const {
     WifiAutoConnect::disconnect();
     if (TesseraeFrame::paint(renderer, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH)) return;
     LOG_ERR("TSR", "Cached frame unreadable; falling back");
-    return renderTesseraeFallbackSleepScreen();
+    return renderTesseraeFallbackSleepScreen(false);
   }
 
   if (frameResult != TesseraeClient::Result::Ok) {
@@ -989,15 +989,32 @@ void SleepActivity::renderTesseraeSleepScreen() const {
   // frame it never painted.
   if (!TesseraeFrame::paint(renderer, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH)) {
     LOG_ERR("TSR", "Frame paint failed; falling back");
-    return renderTesseraeFallbackSleepScreen();
+    return renderTesseraeFallbackSleepScreen(false);
   }
   TESSERAE_STORE.setLastRenderId(frame.renderId);
 }
 
 // Repaints whichever sleep screen the user had selected before switching to
 // Tesserae, so a dashboard failure never leaves a blank or broken panel.
-void SleepActivity::renderTesseraeFallbackSleepScreen() const {
-  switch (TESSERAE_STORE.getFallbackSleepScreen()) {
+//
+// The Last dashboard choice repaints the cached frame instead: the download
+// leaves a good cache intact on every failure, so those bytes are the last
+// dashboard the user saw and a missed fetch keeps it on the glass. Only a
+// missing or unreadable cache drops through to the built-in screen.
+void SleepActivity::renderTesseraeFallbackSleepScreen(const bool cachedFrameUsable) const {
+  const uint8_t fallback = TESSERAE_STORE.getFallbackSleepScreen();
+  if (fallback == TESSERAE_FALLBACK_LAST_DASHBOARD) {
+    if (cachedFrameUsable && TesseraeFrame::cacheExists()) {
+      LOG_INF("TSR", "Keeping the last dashboard on screen");
+      if (TesseraeFrame::paint(renderer, TURN_OFF_SCREEN_AFTER_SLEEP_REFRESH)) return;
+      LOG_ERR("TSR", "Cached frame unreadable; painting the built-in sleep screen");
+    } else {
+      LOG_INF("TSR", "No cached dashboard to keep; painting the built-in sleep screen");
+    }
+    return renderDefaultSleepScreen();
+  }
+
+  switch (fallback) {
     case (CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM):
       return renderCustomSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER):

@@ -49,6 +49,12 @@ size_t tesseraeFrameBytes();
 // cache saves the 48 KB download and its radio airtime, not the refresh.
 constexpr char TESSERAE_FRAME_CACHE_PATH[] = "/.crosspoint/tesserae_frame.bin";
 
+// Fallback choice that repaints the cached frame instead of a reader sleep
+// screen, so a missed fetch leaves the last dashboard on the glass. Sits
+// outside CrossPointSettings::SLEEP_SCREEN_MODE's range so it can share the
+// stored fallbackSleepScreen byte without colliding with a real mode.
+constexpr uint8_t TESSERAE_FALLBACK_LAST_DASHBOARD = 255;
+
 /**
  * Singleton holding the Tesserae pairing state and cached frame identity.
  *
@@ -58,9 +64,9 @@ constexpr char TESSERAE_FRAME_CACHE_PATH[] = "/.crosspoint/tesserae_frame.bin";
  */
 class TesseraeStore : public PersistableStore<TesseraeStore> {
  private:
-  std::string serverUrl;   // e.g. "http://192.168.1.50:8765" (no trailing slash)
-  std::string deviceId;    // assigned by the server at registration
-  std::string token;       // bearer token; plaintext in memory, obfuscated on disk
+  std::string serverUrl;     // e.g. "http://192.168.1.50:8765" (no trailing slash)
+  std::string deviceId;      // assigned by the server at registration
+  std::string token;         // bearer token; plaintext in memory, obfuscated on disk
   std::string lastRenderId;  // ETag of the last painted frame
   uint32_t pollIntervalS = TESSERAE_POLL_DEFAULT_S;
   bool enabled = false;
@@ -70,7 +76,8 @@ class TesseraeStore : public PersistableStore<TesseraeStore> {
   uint8_t refreshStyle = static_cast<uint8_t>(TesseraeRefreshStyle::Simple);
   // Sleep screen to paint when the dashboard can't be fetched. Held here
   // rather than in CrossPointSettings so the binary settings layout is
-  // untouched; stores a CrossPointSettings::SLEEP_SCREEN_MODE value.
+  // untouched; stores a CrossPointSettings::SLEEP_SCREEN_MODE value or
+  // TESSERAE_FALLBACK_LAST_DASHBOARD.
   uint8_t fallbackSleepScreen = 0;  // CrossPointSettings::DARK
 
   TesseraeStore() = default;

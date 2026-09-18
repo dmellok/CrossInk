@@ -10,10 +10,10 @@
 #include "MappedInputManager.h"
 #include "TesseraeFrame.h"
 #include "TesseraeStore.h"
+#include "activities/network/TesseraeViewerActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "activities/network/TesseraeViewerActivity.h"
 #include "network/TesseraeClient.h"
 #include "network/WifiAutoConnect.h"
 
@@ -32,11 +32,12 @@ constexpr int ITEM_VIEW = 6;
 constexpr int ITEM_TEST = 7;
 constexpr int ITEM_UNPAIR = 8;
 
-// Sleep screens offered as the fallback. QUICK_RESUME and TESSERAE_SLEEP are
-// excluded: the first is a different sleep path entirely, the second would
-// recurse.
+// Sleep screens offered as the fallback, plus Last dashboard, which repaints
+// the cached frame. QUICK_RESUME and TESSERAE_SLEEP are excluded: the first is
+// a different sleep path entirely, the second would recurse.
 constexpr uint8_t FALLBACK_MODES[] = {
     static_cast<uint8_t>(CrossPointSettings::DARK),
+    TESSERAE_FALLBACK_LAST_DASHBOARD,
     static_cast<uint8_t>(CrossPointSettings::LIGHT),
     static_cast<uint8_t>(CrossPointSettings::CUSTOM),
     static_cast<uint8_t>(CrossPointSettings::COVER),
@@ -63,6 +64,8 @@ StrId refreshStyleLabel(const TesseraeRefreshStyle style) {
 
 StrId fallbackModeLabel(const uint8_t mode) {
   switch (mode) {
+    case TESSERAE_FALLBACK_LAST_DASHBOARD:
+      return StrId::STR_TESSERAE_FALLBACK_LAST;
     case CrossPointSettings::LIGHT:
       return StrId::STR_LIGHT;
     case CrossPointSettings::CUSTOM:
@@ -230,8 +233,7 @@ void TesseraeSettingsActivity::runConnectionTest() {
 void TesseraeSettingsActivity::handleSelection() {
   switch (static_cast<int>(selectedIndex)) {
     case ITEM_URL: {
-      const std::string prefill =
-          TESSERAE_STORE.getServerUrl().empty() ? "http://" : TESSERAE_STORE.getServerUrl();
+      const std::string prefill = TESSERAE_STORE.getServerUrl().empty() ? "http://" : TESSERAE_STORE.getServerUrl();
       auto handler = [this](const ActivityResult& result) {
         if (result.isCancelled) return;
         const auto& kb = std::get<KeyboardResult>(result.data);
@@ -242,9 +244,8 @@ void TesseraeSettingsActivity::handleSelection() {
         testMessage.clear();
         requestUpdate();
       };
-      startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput,
-                                                                     tr(STR_TESSERAE_SERVER_URL), prefill, 127,
-                                                                     InputType::Url),
+      startActivityForResult(std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_TESSERAE_SERVER_URL),
+                                                                     prefill, 127, InputType::Url),
                              handler);
       break;
     }
@@ -257,8 +258,8 @@ void TesseraeSettingsActivity::handleSelection() {
       requestUpdate();
       break;
     case ITEM_REFRESH_STYLE: {
-      const auto next = static_cast<TesseraeRefreshStyle>(
-          (static_cast<uint8_t>(TESSERAE_STORE.getRefreshStyle()) + 1) % TESSERAE_REFRESH_STYLE_COUNT);
+      const auto next = static_cast<TesseraeRefreshStyle>((static_cast<uint8_t>(TESSERAE_STORE.getRefreshStyle()) + 1) %
+                                                          TESSERAE_REFRESH_STYLE_COUNT);
       TESSERAE_STORE.setRefreshStyle(next);
       requestUpdate();
       break;
@@ -322,18 +323,16 @@ void TesseraeSettingsActivity::render(RenderLock&&) {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight},
-                 tr(STR_TESSERAE_DASHBOARD));
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_TESSERAE_DASHBOARD));
 
   const int contentTop = metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing;
   const int contentHeight = pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
   const int menuItems = getMenuItemCount();
 
   static const StrId fieldNames[] = {StrId::STR_TESSERAE_SERVER_URL,   StrId::STR_TESSERAE_ENABLE,
-                                     StrId::STR_TESSERAE_ALWAYS_FRESH,
-                                     StrId::STR_TESSERAE_REFRESH_STYLE, StrId::STR_TESSERAE_FALLBACK,
-                                     StrId::STR_TESSERAE_STATUS,        StrId::STR_TESSERAE_VIEW,
-                                     StrId::STR_TESSERAE_TEST_NOW};
+                                     StrId::STR_TESSERAE_ALWAYS_FRESH, StrId::STR_TESSERAE_REFRESH_STYLE,
+                                     StrId::STR_TESSERAE_FALLBACK,     StrId::STR_TESSERAE_STATUS,
+                                     StrId::STR_TESSERAE_VIEW,         StrId::STR_TESSERAE_TEST_NOW};
 
   GUI.drawList(
       renderer, Rect{0, contentTop, pageWidth, contentHeight}, menuItems, static_cast<int>(selectedIndex),
@@ -345,8 +344,7 @@ void TesseraeSettingsActivity::render(RenderLock&&) {
       [this](int index) -> std::string {
         switch (index) {
           case ITEM_URL:
-            return TESSERAE_STORE.getServerUrl().empty() ? std::string(tr(STR_NOT_SET))
-                                                         : TESSERAE_STORE.getServerUrl();
+            return TESSERAE_STORE.getServerUrl().empty() ? std::string(tr(STR_NOT_SET)) : TESSERAE_STORE.getServerUrl();
           case ITEM_ENABLED:
             return TESSERAE_STORE.isEnabled() ? std::string(tr(STR_ENABLED)) : std::string(tr(STR_DISABLED));
           case ITEM_ALWAYS_FRESH:

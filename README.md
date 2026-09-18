@@ -85,7 +85,7 @@ Pairing is zero-touch and covers MAC auto-claim, so reflashing silently re-acqui
 | Use as sleep screen | Master enable |
 | Always fetch fresh | Ask the server to re-render on every sleep rather than sending a conditional request. Off by default: it costs a full download each time instead of a 304 |
 | Refresh style | What the viewer shows while fetching: `Verbose` (name each step), `Simple` (one message), `Keep current` (leave the dashboard up until the new frame lands) |
-| Fallback screen | What to paint when the dashboard can't be fetched |
+| Fallback screen | What to paint when the dashboard can't be fetched. `Last dashboard` keeps the cached frame on screen |
 | Status | Not Set / Not paired / Approve in Tesserae / Paired |
 | Test now | Fetch and preview a real frame without waiting for a sleep |
 | Forget pairing | Only shown when paired |
