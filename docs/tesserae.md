@@ -107,7 +107,7 @@ The frame length is validated against the exact expected byte count before anyth
 
 Frame sizes are read from the live panel rather than baked in. The X3 and X4 share one binary and are told apart by the probe `HalGPIO::begin()` already does, so nothing needs selecting between them at build time. The Sticky and X4 Pro are separate ESP32-S3 builds (`-e sticky`, `-e x4-pro`) and resolve their kind from the board macro instead.
 
-Server-side SKUs are `xteink_x4`, `xteink_x4_gray`, `xteink_x3`, `xteink_x3_gray`, `xteink_x4_pro`, `seeed_sticky` and `seeed_sticky_gray`.
+Server-side SKUs are `xteink_x4`, `xteink_x4_gray`, `xteink_x3`, `xteink_x3_gray`, `xteink_x4_pro`, `xteink_x4_pro_gray`, `seeed_sticky` and `seeed_sticky_gray`.
 
 **On the Sticky specifically:** CrossInk itself runs on the hardware, but the dashboard cannot pair until `seeed_sticky` / `seeed_sticky_gray` land in the Tesserae catalog ([dmellok/tesserae#245](https://github.com/dmellok/tesserae/pull/245)). The panel is the same 800×480 SSD1677 as the X4 and de-link, driven through the same framebuffer path, so the packed frame is byte-identical and only the announced kind differs. The orientation in that catalog entry is inherited from `xteink_x4` rather than observed: CrossInk's Portrait transform is board-independent and both board profiles ship `NO_FLIP`, so the same 180° offset should apply. If a dashboard paints upside-down there, the entry needs `portrait` and the SDK board profile probably needs `ROTATE_180`. CrossInk's own Sticky profile also lists the SD-over-shared-SPI arbitration as inferred from the vendor demo.
 
